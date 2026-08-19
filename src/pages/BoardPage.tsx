@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
 import { BookCheck, BookOpenText, CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
+import { REVIEWABLE_STATUSES } from '@/constants/statuses'
 import type { Application, InterviewReview } from '@/types/application'
 import { formatShortDate } from '@/utils/date'
 
@@ -152,6 +153,7 @@ export function BoardPage({ applications, reviews, statuses, onOpen, onReview, o
                   <div className="kanban-list">
                     {items.map((application) => {
                       const review = reviews.find((item) => item.applicationId === application.id)
+                      const reviewable = REVIEWABLE_STATUSES.includes(application.status)
                       const ReviewIcon = review ? BookCheck : BookOpenText
                       return (
                       <article
@@ -170,15 +172,17 @@ export function BoardPage({ applications, reviews, statuses, onOpen, onReview, o
                         <div className="card-meta">
                           <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>
                           {application.location && <span><MapPin size={13} />{application.location}</span>}
-                          <button
-                            className={`card-review-action ${review ? 'completed' : ''}`}
-                            draggable={false}
-                            aria-label={`${application.companyName}${review ? '已复盘，打开复盘' : '未复盘，创建复盘'}`}
-                            title={review ? '打开关联复盘' : '创建关联复盘'}
-                            onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => { event.stopPropagation(); onReview(application, review) }}
-                          ><ReviewIcon size={13} />{review ? '已复盘' : '未复盘'}</button>
-                          <GripVertical size={15} className="drag-handle" />
+                          <div className="card-actions">
+                            {reviewable && <button
+                              className={`card-review-action ${review ? 'completed' : 'pending'}`}
+                              draggable={false}
+                              aria-label={`${application.companyName}${review ? '已复盘，打开复盘' : '未复盘，创建复盘'}`}
+                              title={review ? '打开关联复盘' : '创建关联复盘'}
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => { event.stopPropagation(); onReview(application, review) }}
+                            ><ReviewIcon size={13} />{review ? '已复盘' : '未复盘'}</button>}
+                            <GripVertical size={15} className="drag-handle" />
+                          </div>
                         </div>
                       </article>
                     )})}

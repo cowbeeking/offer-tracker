@@ -729,15 +729,31 @@
   }
 
   .card-review-action {
-    @apply ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-[9px] font-medium text-muted transition hover:bg-accent/10 hover:text-accent;
+    @apply inline-flex h-5 items-center gap-1 rounded border px-1.5 text-[9px] font-medium transition;
+  }
+
+  .card-review-action.pending {
+    @apply border-amber-200/80 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100;
   }
 
   .card-review-action.completed {
-    @apply bg-accent/10 text-accent;
+    @apply border-emerald-200/80 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100;
+  }
+
+  .dark .card-review-action.pending {
+    @apply border-amber-800/70 bg-amber-950/40 text-amber-300 hover:bg-amber-950/65;
+  }
+
+  .dark .card-review-action.completed {
+    @apply border-emerald-800/70 bg-emerald-950/40 text-emerald-300 hover:bg-emerald-950/65;
   }
 
   .drag-handle {
     @apply text-muted/60;
+  }
+
+  .card-actions {
+    @apply ml-auto flex items-center gap-2;
   }
 
   .column-empty {
