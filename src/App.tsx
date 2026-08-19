@@ -15,6 +15,7 @@ import { ReviewsPage } from '@/pages/ReviewsPage'
 import { KnowledgeNotesPage } from '@/pages/KnowledgeNotesPage'
 import type { Application, ApplicationDraft, ApplicationNodeProgress, PageKey, WorkflowNode } from '@/types/application'
 import { createInterviewReview } from '@/utils/review'
+import { findPreviousWorkflowNode } from '@/utils/workflow'
 
 const PAGE_LABELS: Record<PageKey, string> = {
   dashboard: '概览',
@@ -256,12 +257,8 @@ export function App(): JSX.Element {
   }
 
   const undoApplicationStatus = (application: Application): void => {
-    const currentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
-    const previousHistory = currentHistoryIndex > 0
-      ? [...application.histories.slice(0, currentHistoryIndex)].reverse().find((history) =>
-          history.status !== application.status && state.workflowNodes.some((node) => node.name === history.status))
-      : undefined
-    if (!previousHistory) {
+    const previousNode = findPreviousWorkflowNode(application, state.workflowNodes)
+    if (!previousNode) {
       notify('当前已经是该投递的第一个节点，无法继续撤销', 'error')
       return
     }
@@ -274,7 +271,7 @@ export function App(): JSX.Element {
       if (reminderAlert?.application.id === application.id && reminderAlert.node.id === currentNode.id) setReminderAlert(undefined)
     }
     undoStatus(application.id)
-    notify(`已撤销到「${previousHistory.status}」，并清理后一节点的待办与复盘`)
+    notify(`已撤销到「${previousNode.name}」，并清理后一节点的待办与复盘`)
   }
 
   const openApplicationReview = (application: Application, node: WorkflowNode): void => {

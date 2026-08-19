@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { StatusTag } from '@/components/StatusTag'
 import type { Application, ApplicationNodeProgress, InterviewReview, WorkflowNode } from '@/types/application'
 import { formatChineseDate } from '@/utils/date'
+import { findPreviousWorkflowNode } from '@/utils/workflow'
 
 interface ApplicationDetailProps {
   application?: Application
@@ -36,9 +37,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
   }, [onClose])
 
   if (!application) return null
-  const currentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
-  const canUndo = currentHistoryIndex > 0 && application.histories.slice(0, currentHistoryIndex).some((history) =>
-    history.status !== application.status && workflowNodes.some((node) => node.name === history.status))
+  const canUndo = Boolean(findPreviousWorkflowNode(application, workflowNodes))
 
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>

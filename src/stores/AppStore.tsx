@@ -18,6 +18,7 @@ import type {
 import { loadState, saveState } from '@/services/storage'
 import { toDateInput } from '@/utils/date'
 import { createId } from '@/utils/id'
+import { findPreviousWorkflowNode } from '@/utils/workflow'
 
 const EMPTY_STATE: AppStateData = {
   version: 1,
@@ -352,14 +353,12 @@ function reducer(state: AppStateData, action: Action): AppStateData {
       if (!application) return state
       const currentNode = state.workflowNodes.find((node) => node.name === application.status)
       if (!currentNode) return state
-      const latestCurrentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
-      const previousHistory = latestCurrentHistoryIndex > 0
-        ? [...application.histories.slice(0, latestCurrentHistoryIndex)].reverse().find((history) =>
-            history.status !== application.status && state.workflowNodes.some((node) => node.name === history.status))
-        : undefined
-      const previousNode = previousHistory ? state.workflowNodes.find((node) => node.name === previousHistory.status) : undefined
+      const previousNode = findPreviousWorkflowNode(application, state.workflowNodes)
       if (!previousNode) return state
       const now = Date.now()
+      const previousNodeIndex = state.workflowNodes.findIndex((node) => node.id === previousNode.id)
+      const retainedNodeIds = new Set(state.workflowNodes.slice(0, previousNodeIndex + 1).map((node) => node.id))
+      const retainedStatusNames = new Set(state.workflowNodes.slice(0, previousNodeIndex + 1).map((node) => node.name))
       return {
         ...state,
         applications: state.applications.map((item) => {
@@ -367,9 +366,9 @@ function reducer(state: AppStateData, action: Action): AppStateData {
           return {
             ...item,
             status: previousNode.name,
-            histories: item.histories.filter((_, index) => index !== latestCurrentHistoryIndex),
+            histories: item.histories.filter((history) => retainedStatusNames.has(history.status)),
             nodeProgress: item.nodeProgress
-              .filter((progress) => progress.workflowNodeId !== currentNode.id)
+              .filter((progress) => retainedNodeIds.has(progress.workflowNodeId))
               .map((progress) => progress.workflowNodeId === previousNode.id
                 ? { ...progress, state: 'active' as const, updatedAt: now }
                 : progress.state === 'active' ? { ...progress, state: 'completed' as const, updatedAt: now } : progress),
@@ -377,7 +376,7 @@ function reducer(state: AppStateData, action: Action): AppStateData {
             updatedAt: now,
           }
         }),
-        reviews: state.reviews.filter((review) => !(review.applicationId === action.id && review.workflowNodeId === currentNode.id)),
+        reviews: state.reviews.filter((review) => review.applicationId !== action.id || !review.workflowNodeId || retainedNodeIds.has(review.workflowNodeId)),
       }
     }
     case 'REPLACE_DATA': {
