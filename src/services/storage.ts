@@ -14,6 +14,7 @@ function openDatabase(): Promise<IDBDatabase> {
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
+    request.onblocked = () => reject(new Error('本地数据库正在被其他窗口占用'))
   })
 }
 
@@ -25,6 +26,10 @@ export async function loadState(): Promise<AppStateData | null> {
     request.onsuccess = () => resolve((request.result as AppStateData | undefined) ?? null)
     request.onerror = () => reject(request.error)
     transaction.oncomplete = () => database.close()
+    transaction.onabort = () => {
+      database.close()
+      reject(transaction.error)
+    }
   })
 }
 
@@ -37,6 +42,9 @@ export async function saveState(state: AppStateData): Promise<void> {
       database.close()
       resolve()
     }
-    transaction.onerror = () => reject(transaction.error)
+    transaction.onabort = () => {
+      database.close()
+      reject(transaction.error)
+    }
   })
 }

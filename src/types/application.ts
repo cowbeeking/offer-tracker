@@ -60,6 +60,7 @@ export interface ApplicationDraft {
 }
 
 export type ThemeMode = 'light' | 'dark' | 'system'
+export type PersistenceStatus = 'saving' | 'saved' | 'error'
 export type PageKey = 'dashboard' | 'applications' | 'board' | 'statistics' | 'settings'
 
 export interface AppStateData {

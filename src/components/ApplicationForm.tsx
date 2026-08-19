@@ -4,11 +4,11 @@ import type { Application, ApplicationDraft } from '@/types/application'
 import { toDateInput } from '@/utils/date'
 
 function draftFromApplication(application?: Application): ApplicationDraft {
-  const latest = application?.histories.at(-1)
+  const today = toDateInput()
   return {
     companyName: application?.companyName ?? '',
     positionName: application?.positionName ?? '',
-    applicationDate: application?.applicationDate ?? toDateInput(),
+    applicationDate: application?.applicationDate ?? today,
     deadline: application?.deadline ?? '',
     status: application?.status ?? '已投递',
     location: application?.location ?? '',
@@ -17,8 +17,8 @@ function draftFromApplication(application?: Application): ApplicationDraft {
     link: application?.link ?? '',
     salary: application?.salary ?? '',
     notes: application?.notes ?? '',
-    eventDate: latest?.date ?? toDateInput(),
-    eventTime: latest?.time ?? '',
+    eventDate: today,
+    eventTime: '',
   }
 }
 
@@ -33,9 +33,11 @@ interface ApplicationFormProps {
 export function ApplicationForm({ application, statuses, companies, onSubmit, onCancel }: ApplicationFormProps): JSX.Element {
   const [draft, setDraft] = useState<ApplicationDraft>(() => draftFromApplication(application))
   const [error, setError] = useState('')
+  const [eventDateTouched, setEventDateTouched] = useState(false)
   const companyOptions = useMemo(() => [...new Set(companies)].sort((a, b) => a.localeCompare(b, 'zh-CN')), [companies])
 
   const setField = <K extends keyof ApplicationDraft>(field: K, value: ApplicationDraft[K]): void => {
+    if (error) setError('')
     setDraft((current) => ({ ...current, [field]: value }))
   }
 
@@ -47,6 +49,15 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
     }
     if (draft.link && !/^https?:\/\//i.test(draft.link)) {
       setError('招聘链接需要以 http:// 或 https:// 开头。')
+      return
+    }
+    if (draft.deadline && draft.deadline < draft.applicationDate) {
+      setError('截止日期不能早于投递日期。')
+      return
+    }
+    const recordsNewEvent = !application || application.status !== draft.status
+    if (recordsNewEvent && draft.eventDate && draft.eventDate < draft.applicationDate) {
+      setError('流程事件日期不能早于投递日期。')
       return
     }
     onSubmit(draft)
@@ -78,7 +89,15 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
         </label>
         <label className="field">
           <span>投递日期 <em>*</em></span>
-          <input type="date" value={draft.applicationDate} onChange={(event) => setField('applicationDate', event.target.value)} />
+          <input type="date" value={draft.applicationDate} onChange={(event) => {
+            const value = event.target.value
+            if (error) setError('')
+            setDraft((current) => ({
+              ...current,
+              applicationDate: value,
+              eventDate: !application && !eventDateTouched ? value : current.eventDate,
+            }))
+          }} />
         </label>
         <label className="field">
           <span>截止日期</span>
@@ -115,7 +134,7 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
           <div className="event-fields">
             <label className="field">
               <span>事件日期</span>
-              <input type="date" value={draft.eventDate} onChange={(event) => setField('eventDate', event.target.value)} />
+              <input type="date" value={draft.eventDate} onChange={(event) => { setEventDateTouched(true); setField('eventDate', event.target.value) }} />
             </label>
             <label className="field">
               <span>事件时间</span>
