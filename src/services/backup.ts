@@ -8,11 +8,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function requiredString(value: unknown, field: string): string {
   if (typeof value !== 'string' || !value.trim()) throw new Error(`字段 ${field} 缺失或格式错误`)
-  return value
+  return value.trim()
 }
 
 function optionalString(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value : undefined
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined
+}
+
+function dateString(value: unknown, field: string): string {
+  const text = requiredString(value, field)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error(`字段 ${field} 不是有效日期`)
+  const date = new Date(`${text}T00:00:00Z`)
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== text) {
+    throw new Error(`字段 ${field} 不是有效日期`)
+  }
+  return text
+}
+
+function optionalTime(value: unknown): string | undefined {
+  const text = optionalString(value)
+  if (text && !/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) throw new Error('流程历史时间格式错误')
+  return text
 }
 
 function parseHistory(value: unknown, applicationId: string): StatusHistory {
@@ -21,8 +37,8 @@ function parseHistory(value: unknown, applicationId: string): StatusHistory {
     id: optionalString(value.id) ?? createId(),
     applicationId,
     status: requiredString(value.status, 'history.status'),
-    date: requiredString(value.date, 'history.date'),
-    time: optionalString(value.time),
+    date: dateString(value.date, 'history.date'),
+    time: optionalTime(value.time),
     note: optionalString(value.note),
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
   }
@@ -32,15 +48,26 @@ function parseApplication(value: unknown): Application {
   if (!isRecord(value)) throw new Error('投递记录格式错误')
   const id = optionalString(value.id) ?? createId()
   const status = requiredString(value.status, 'status')
-  const histories = Array.isArray(value.histories)
+  const applicationDate = dateString(value.applicationDate, 'applicationDate')
+  const parsedHistories = Array.isArray(value.histories)
     ? value.histories.map((history) => parseHistory(history, id))
     : []
+  const histories = parsedHistories.length
+    ? parsedHistories
+    : [{
+        id: createId(),
+        applicationId: id,
+        status,
+        date: applicationDate,
+        note: '从备份恢复',
+        createdAt: Date.now(),
+      }]
   return {
     id,
     companyName: requiredString(value.companyName, 'companyName'),
     positionName: requiredString(value.positionName, 'positionName'),
-    applicationDate: requiredString(value.applicationDate, 'applicationDate'),
-    deadline: optionalString(value.deadline),
+    applicationDate,
+    deadline: value.deadline ? dateString(value.deadline, 'deadline') : undefined,
     status,
     location: optionalString(value.location),
     source: optionalString(value.source),
@@ -74,22 +101,36 @@ export function parseBackup(raw: string): AppStateData {
   if (!isRecord(parsed) || parsed.app !== 'autumn-offer-tracker' || !isRecord(parsed.data)) {
     throw new Error('这不是秋招 Tracker 的备份文件')
   }
+  if (parsed.version !== 1) throw new Error('备份版本不受支持，请使用当前版本导出的文件')
   const data = parsed.data
   if (!Array.isArray(data.applications)) throw new Error('备份中缺少投递记录')
-  const customStatuses = Array.isArray(data.customStatuses)
-    ? data.customStatuses.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-    : []
+  const customStatuses = [...new Set(Array.isArray(data.customStatuses)
+    ? data.customStatuses
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        .map((item) => item.trim())
+        .filter((status) => !DEFAULT_STATUSES.includes(status as (typeof DEFAULT_STATUSES)[number]))
+    : [])]
   const discoveredStatuses = data.applications
-    .map((item) => (isRecord(item) && typeof item.status === 'string' ? item.status : ''))
+    .map((item) => (isRecord(item) && typeof item.status === 'string' ? item.status.trim() : ''))
     .filter(
       (status) =>
         status &&
         !DEFAULT_STATUSES.includes(status as (typeof DEFAULT_STATUSES)[number]) &&
         !customStatuses.includes(status),
     )
+  const seenIds = new Set<string>()
+  const applications = data.applications.map(parseApplication).map((application) => {
+    if (!seenIds.has(application.id)) {
+      seenIds.add(application.id)
+      return application
+    }
+    const id = createId()
+    seenIds.add(id)
+    return { ...application, id, histories: application.histories.map((history) => ({ ...history, applicationId: id })) }
+  })
   return {
     version: 1,
-    applications: data.applications.map(parseApplication),
+    applications,
     customStatuses: [...customStatuses, ...new Set(discoveredStatuses)],
     theme: data.theme === 'light' || data.theme === 'dark' || data.theme === 'system' ? data.theme : 'system',
     initialized: true,

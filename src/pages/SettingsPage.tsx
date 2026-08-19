@@ -3,6 +3,7 @@ import { ChevronLeft, Database, Download, FileJson, FileSpreadsheet, Monitor, Mo
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { applicationsToCsv, createBackup, parseBackup } from '@/services/backup'
+import { DEFAULT_STATUSES } from '@/types/application'
 import type { AppStateData, ThemeMode } from '@/types/application'
 import { toDateInput } from '@/utils/date'
 
@@ -30,33 +31,41 @@ async function downloadFallback(content: string, name: string, type: string): Pr
 
 export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemoveDemo, onThemeChange, onAddStatus, onRemoveStatus, onNotify }: SettingsPageProps): JSX.Element {
   const [clearOpen, setClearOpen] = useState(false)
+  const [pendingImport, setPendingImport] = useState<AppStateData>()
   const [newStatus, setNewStatus] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   const demoCount = data.applications.filter((item) => item.isDemo).length
 
   const exportJson = async (): Promise<void> => {
-    const content = JSON.stringify(createBackup(data), null, 2)
-    const name = `job-applications-backup-${toDateInput()}.json`
-    const saved = window.desktopApi
-      ? await window.desktopApi.saveFile(content, name, 'json')
-      : (await downloadFallback(content, name, 'application/json'), true)
-    if (saved) onNotify('JSON 备份已导出')
+    try {
+      const content = JSON.stringify(createBackup(data), null, 2)
+      const name = `job-applications-backup-${toDateInput()}.json`
+      const saved = window.desktopApi
+        ? await window.desktopApi.saveFile(content, name, 'json')
+        : (await downloadFallback(content, name, 'application/json'), true)
+      if (saved) onNotify('JSON 备份已导出')
+    } catch {
+      onNotify('JSON 备份导出失败', 'error')
+    }
   }
 
   const exportCsv = async (): Promise<void> => {
-    const content = applicationsToCsv(data.applications)
-    const name = `job-applications-${toDateInput()}.csv`
-    const saved = window.desktopApi
-      ? await window.desktopApi.saveFile(content, name, 'csv')
-      : (await downloadFallback(content, name, 'text/csv;charset=utf-8'), true)
-    if (saved) onNotify('CSV 表格已导出')
+    try {
+      const content = applicationsToCsv(data.applications)
+      const name = `job-applications-${toDateInput()}.csv`
+      const saved = window.desktopApi
+        ? await window.desktopApi.saveFile(content, name, 'csv')
+        : (await downloadFallback(content, name, 'text/csv;charset=utf-8'), true)
+      if (saved) onNotify('CSV 表格已导出')
+    } catch {
+      onNotify('CSV 表格导出失败', 'error')
+    }
   }
 
   const importRaw = (raw: string): void => {
     try {
       const parsed = parseBackup(raw)
-      onReplaceData(parsed)
-      onNotify(`已恢复 ${parsed.applications.length} 条投递记录`)
+      setPendingImport(parsed)
     } catch (error: unknown) {
       onNotify(error instanceof Error ? error.message : '导入失败，请检查文件', 'error')
     }
@@ -67,21 +76,31 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
       fileInput.current?.click()
       return
     }
-    const raw = await window.desktopApi.openJsonFile()
-    if (raw) importRaw(raw)
+    try {
+      const raw = await window.desktopApi.openJsonFile()
+      if (raw) importRaw(raw)
+    } catch {
+      onNotify('无法读取备份文件', 'error')
+    }
   }
 
   const handleFile = (event: ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0]
     if (!file) return
-    void file.text().then(importRaw)
+    void file.text().then(importRaw).catch(() => onNotify('无法读取备份文件', 'error'))
     event.target.value = ''
   }
 
   const submitStatus = (): void => {
-    if (!newStatus.trim()) return
-    onAddStatus(newStatus)
+    const status = newStatus.trim()
+    if (!status) return
+    if (DEFAULT_STATUSES.includes(status as (typeof DEFAULT_STATUSES)[number]) || data.customStatuses.includes(status)) {
+      onNotify('这个流程节点已经存在', 'error')
+      return
+    }
+    onAddStatus(status)
     setNewStatus('')
+    onNotify(`已添加流程节点「${status}」`)
   }
 
   return (
@@ -124,7 +143,7 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
         <section className="settings-section panel">
           <div className="settings-copy"><span className="settings-icon"><Plus size={18} /></span><div><h2>自定义流程节点</h2><p>默认节点保持稳定，也可以补充适合自己的招聘阶段。</p></div></div>
           <div className="custom-status-editor">
-            <div className="status-input-row"><input value={newStatus} onChange={(event) => setNewStatus(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitStatus() }} placeholder="例如：主管面 / 意向书" /><Button variant="primary" size="sm" onClick={submitStatus}>添加节点</Button></div>
+            <div className="status-input-row"><input maxLength={20} value={newStatus} onChange={(event) => setNewStatus(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitStatus() }} placeholder="例如：主管面 / 意向书" /><Button variant="primary" size="sm" onClick={submitStatus}>添加节点</Button></div>
             {data.customStatuses.length ? <div className="custom-status-list">{data.customStatuses.map((status) => {
               const inUse = data.applications.some((item) => item.status === status)
               return <span key={status}>{status}<button disabled={inUse} title={inUse ? '仍有投递使用此节点' : '删除节点'} onClick={() => onRemoveStatus(status)}><X size={13} /></button></span>
@@ -133,6 +152,20 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
         </section>
       </div>
       <ConfirmDialog open={clearOpen} title="确定清空所有投递记录吗？" description="全部投递和流程历史都会被永久删除，此操作无法撤销。建议先导出 JSON 备份。" confirmText="确认清空" onClose={() => setClearOpen(false)} onConfirm={() => { onClearData(); setClearOpen(false); onNotify('本地投递数据已清空') }} />
+      <ConfirmDialog
+        open={Boolean(pendingImport)}
+        title="导入并覆盖当前数据？"
+        description={pendingImport ? `备份包含 ${pendingImport.applications.length} 条投递记录。导入后会替换当前 ${data.applications.length} 条记录，建议先导出 JSON 备份。` : ''}
+        confirmText="确认导入"
+        tone="normal"
+        onClose={() => setPendingImport(undefined)}
+        onConfirm={() => {
+          if (!pendingImport) return
+          onReplaceData(pendingImport)
+          onNotify(`已恢复 ${pendingImport.applications.length} 条投递记录`)
+          setPendingImport(undefined)
+        }}
+      />
     </div>
   )
 }

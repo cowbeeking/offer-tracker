@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Check, Plus, Search, X } from 'lucide-react'
+import { AlertTriangle, Check, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { ApplicationDetail } from '@/components/ApplicationDetail'
 import { ApplicationModal } from '@/components/ApplicationModal'
 import { Sidebar } from '@/components/Sidebar'
@@ -25,6 +25,9 @@ export function App(): JSX.Element {
   const {
     state,
     loading,
+    loadError,
+    persistenceStatus,
+    persistenceError,
     statuses,
     addApplication,
     updateApplication,
@@ -36,6 +39,8 @@ export function App(): JSX.Element {
     setTheme,
     addCustomStatus,
     removeCustomStatus,
+    retryLoad,
+    retrySave,
   } = useAppStore()
   const [page, setPage] = useState<PageKey>('dashboard')
   const [lastWorkspacePage, setLastWorkspacePage] = useState<Exclude<PageKey, 'settings'>>('dashboard')
@@ -101,6 +106,9 @@ export function App(): JSX.Element {
         setDetailId(undefined)
         return
       }
+      const target = event.target
+      if (target instanceof HTMLElement && target.matches('input, textarea, select, [contenteditable="true"]')) return
+      if (page === 'settings' || formOpen || detailId || deleting) return
       if (!(event.ctrlKey || event.metaKey)) return
       if (event.key.toLowerCase() === 'n') {
         event.preventDefault()
@@ -114,7 +122,7 @@ export function App(): JSX.Element {
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [navigateTo, openCreate])
+  }, [deleting, detailId, formOpen, navigateTo, openCreate, page])
 
   const saveApplication = (draft: ApplicationDraft): void => {
     if (editing) {
@@ -147,9 +155,13 @@ export function App(): JSX.Element {
     return <div className="app-loading"><span className="brand-mark">秋</span><div><strong>秋招 Tracker</strong><small>正在读取本地数据…</small></div></div>
   }
 
+  if (loadError) {
+    return <div className="storage-error"><span><AlertTriangle size={22} /></span><h1>本地数据读取失败</h1><p>{loadError}</p><Button variant="primary" icon={<RefreshCw size={14} />} onClick={retryLoad}>重新读取</Button></div>
+  }
+
   return (
     <div className={`app-shell ${page === 'settings' ? 'settings-mode' : ''}`}>
-      {page !== 'settings' && <Sidebar page={page} onNavigate={navigateTo} />}
+      {page !== 'settings' && <Sidebar page={page} persistenceStatus={persistenceStatus} persistenceError={persistenceError} onNavigate={navigateTo} onRetrySave={retrySave} />}
       <main className={`app-main ${page === 'settings' ? 'settings-main' : ''}`}>
         {page !== 'settings' && <div className="app-topbar">
           <div className="breadcrumb"><span>Autumn Tracker</span><i>/</i><strong>{PAGE_LABELS[page]}</strong></div>

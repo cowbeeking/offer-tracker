@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useEffect, useMemo, useReducer, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { createDemoApplications } from '@/constants/demo'
 import { DEFAULT_STATUSES } from '@/types/application'
 import type {
@@ -7,6 +7,7 @@ import type {
   Application,
   ApplicationDraft,
   ApplicationStatus,
+  PersistenceStatus,
   StatusHistory,
   ThemeMode,
 } from '@/types/application'
@@ -178,6 +179,9 @@ function reducer(state: AppStateData, action: Action): AppStateData {
 interface AppStoreValue {
   state: AppStateData
   loading: boolean
+  loadError?: string
+  persistenceStatus: PersistenceStatus
+  persistenceError?: string
   statuses: string[]
   addApplication: (draft: ApplicationDraft) => void
   updateApplication: (id: string, draft: ApplicationDraft) => void
@@ -193,6 +197,8 @@ interface AppStoreValue {
   setTheme: (theme: ThemeMode) => void
   addCustomStatus: (status: string) => void
   removeCustomStatus: (status: string) => void
+  retryLoad: () => void
+  retrySave: () => void
 }
 
 const AppStoreContext = createContext<AppStoreValue | null>(null)
@@ -200,12 +206,21 @@ const AppStoreContext = createContext<AppStoreValue | null>(null)
 export function AppStoreProvider({ children }: { children: React.ReactNode }): JSX.Element {
   const [state, dispatch] = useReducer(reducer, EMPTY_STATE)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string>()
+  const [persistenceStatus, setPersistenceStatus] = useState<PersistenceStatus>('saved')
+  const [persistenceError, setPersistenceError] = useState<string>()
+  const loadRequestRef = useRef(0)
+  const saveRevisionRef = useRef(0)
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve())
+  const mountedRef = useRef(true)
 
-  useEffect(() => {
-    let active = true
+  const readState = useCallback((): void => {
+    const requestId = ++loadRequestRef.current
+    setLoading(true)
+    setLoadError(undefined)
     loadState()
       .then((saved) => {
-        if (!active) return
+        if (!mountedRef.current || requestId !== loadRequestRef.current) return
         dispatch({
           type: 'LOAD',
           state: saved ?? {
@@ -214,31 +229,62 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
             initialized: true,
           },
         })
+        setPersistenceStatus('saved')
+        setPersistenceError(undefined)
       })
       .catch((error: unknown) => {
         console.error('读取本地数据失败', error)
-        if (active) dispatch({ type: 'LOAD', state: { ...EMPTY_STATE, initialized: true } })
+        if (mountedRef.current && requestId === loadRequestRef.current) {
+          setLoadError('无法读取本地数据。请重试，应用不会覆盖原有数据。')
+        }
       })
       .finally(() => {
-        if (active) setLoading(false)
+        if (mountedRef.current && requestId === loadRequestRef.current) setLoading(false)
       })
-    return () => {
-      active = false
-    }
+  }, [])
+
+  const persist = useCallback((snapshot: AppStateData): void => {
+    const revision = ++saveRevisionRef.current
+    setPersistenceStatus('saving')
+    setPersistenceError(undefined)
+    const task = saveQueueRef.current
+      .catch(() => undefined)
+      .then(() => saveState(snapshot))
+    saveQueueRef.current = task
+    void task
+      .then(() => {
+        if (!mountedRef.current || revision !== saveRevisionRef.current) return
+        setPersistenceStatus('saved')
+      })
+      .catch((error: unknown) => {
+        console.error('保存本地数据失败', error)
+        if (!mountedRef.current || revision !== saveRevisionRef.current) return
+        setPersistenceStatus('error')
+        setPersistenceError('保存失败，点击重试')
+      })
   }, [])
 
   useEffect(() => {
+    mountedRef.current = true
+    readState()
+    return () => {
+      mountedRef.current = false
+      loadRequestRef.current += 1
+    }
+  }, [readState])
+
+  useEffect(() => {
     if (loading || !state.initialized) return
-    const timer = window.setTimeout(() => {
-      void saveState(state).catch((error: unknown) => console.error('保存本地数据失败', error))
-    }, 120)
-    return () => window.clearTimeout(timer)
-  }, [loading, state])
+    persist(state)
+  }, [loading, persist, state])
 
   const value = useMemo<AppStoreValue>(
     () => ({
       state,
       loading,
+      loadError,
+      persistenceStatus,
+      persistenceError,
       statuses: [...DEFAULT_STATUSES, ...state.customStatuses],
       addApplication: (draft) => dispatch({ type: 'ADD_APPLICATION', draft }),
       updateApplication: (id, draft) => dispatch({ type: 'UPDATE_APPLICATION', id, draft }),
@@ -250,8 +296,10 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
       setTheme: (theme) => dispatch({ type: 'SET_THEME', theme }),
       addCustomStatus: (status) => dispatch({ type: 'ADD_STATUS', status }),
       removeCustomStatus: (status) => dispatch({ type: 'REMOVE_STATUS', status }),
+      retryLoad: readState,
+      retrySave: () => persist(state),
     }),
-    [loading, state],
+    [loadError, loading, persist, persistenceError, persistenceStatus, readState, state],
   )
 
   return <AppStoreContext.Provider value={value}>{children}</AppStoreContext.Provider>
