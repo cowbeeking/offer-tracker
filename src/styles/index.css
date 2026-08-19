@@ -449,7 +449,7 @@
   }
 
   .compact-main,
-  .card-main > span:last-child {
+  .card-copy {
     @apply flex min-w-0 flex-1 flex-col;
   }
 
@@ -597,6 +597,14 @@
 
   .position-cell {
     @apply block max-w-[260px] truncate text-ink/85;
+  }
+
+  .position-with-preference {
+    @apply flex min-w-0 items-center gap-2;
+  }
+
+  .preference-badge {
+    @apply inline-flex flex-none whitespace-nowrap rounded-full border border-accent/15 bg-accent/5 px-1.5 py-0.5 text-[8px] font-medium text-accent;
   }
 
   .date-cell,
@@ -1132,6 +1140,10 @@
     @apply mt-1 text-xs text-muted;
   }
 
+  .detail-position-row {
+    @apply flex items-center gap-2;
+  }
+
   .detail-actions {
     @apply mt-4 flex gap-2;
   }
@@ -1383,6 +1395,272 @@
     @apply mt-1 text-[10px] text-muted;
   }
 
+  .reviews-page {
+    @apply flex h-full min-h-0 flex-col overflow-hidden pb-7;
+  }
+
+  .review-page-heading {
+    @apply flex-none items-center;
+  }
+
+  .review-workspace {
+    @apply grid min-h-0 flex-1 overflow-hidden;
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .review-notes-sidebar {
+    @apply flex min-h-0 flex-col border-r border-line bg-canvas/40;
+  }
+
+  .review-sidebar-head {
+    @apply flex-none border-b border-line p-3;
+  }
+
+  .review-sidebar-head > div {
+    @apply mb-2 flex items-center justify-between px-0.5;
+  }
+
+  .review-sidebar-head strong {
+    @apply text-[11px] font-semibold text-ink;
+  }
+
+  .review-sidebar-head > div > span {
+    @apply inline-flex min-w-5 items-center justify-center rounded-full bg-ink/5 px-1.5 py-0.5 text-[9px] font-medium text-muted;
+  }
+
+  .review-search {
+    @apply flex h-8 items-center gap-2 rounded-md border border-line bg-panel px-2 text-muted transition focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/10;
+  }
+
+  .review-search input {
+    @apply min-w-0 flex-1 border-0 bg-transparent text-[10px] text-ink outline-none ring-0 placeholder:text-muted/70;
+  }
+
+  .review-note-list {
+    @apply min-h-0 flex-1 overflow-y-auto p-2;
+  }
+
+  .review-note-list > button {
+    @apply mb-1 flex w-full gap-2.5 rounded-lg border border-transparent p-2.5 text-left transition hover:bg-ink/[0.035];
+  }
+
+  .review-note-list > button.active {
+    @apply border-accent/15 bg-accent/[0.08];
+  }
+
+  .review-note-icon {
+    @apply mt-0.5 grid size-7 flex-none place-items-center rounded-md border border-line bg-panel text-muted;
+  }
+
+  .review-note-list > button.active .review-note-icon {
+    @apply border-accent/20 bg-accent/10 text-accent;
+  }
+
+  .review-note-copy {
+    @apply min-w-0 flex-1;
+  }
+
+  .review-note-copy strong,
+  .review-note-copy small,
+  .review-note-copy time {
+    @apply block truncate;
+  }
+
+  .review-note-copy strong {
+    @apply text-[11px] font-medium leading-4 text-ink;
+  }
+
+  .review-note-copy small {
+    @apply mt-0.5 text-[9px] leading-4 text-muted;
+  }
+
+  .review-note-copy time {
+    @apply mt-1 text-[8px] text-muted/70;
+  }
+
+  .review-list-empty {
+    @apply flex h-full min-h-44 flex-col items-center justify-center px-4 text-center text-muted;
+  }
+
+  .review-list-empty strong {
+    @apply mt-2 text-[10px] font-medium text-ink;
+  }
+
+  .review-list-empty span {
+    @apply mt-1 text-[9px] leading-4;
+  }
+
+  .review-editor-shell {
+    @apply flex min-h-0 min-w-0 flex-col bg-panel;
+  }
+
+  .review-editor-head {
+    @apply flex h-14 flex-none items-center justify-between gap-4 border-b border-line px-5;
+  }
+
+  .review-title-input {
+    @apply min-w-0 flex-1 border-0 bg-transparent text-[17px] font-semibold tracking-[-0.02em] text-ink outline-none ring-0 placeholder:text-muted/60;
+  }
+
+  .review-editor-tools,
+  .review-mode-switch {
+    @apply flex flex-none items-center;
+  }
+
+  .review-editor-tools {
+    @apply gap-1.5;
+  }
+
+  .review-mode-switch {
+    @apply mr-1 rounded-md border border-line bg-canvas p-0.5;
+  }
+
+  .review-mode-switch button {
+    @apply inline-flex h-6 items-center gap-1 rounded px-2 text-[9px] font-medium text-muted transition hover:text-ink;
+  }
+
+  .review-mode-switch button.active {
+    @apply bg-panel text-ink shadow-sm;
+  }
+
+  .review-delete-button {
+    @apply grid size-7 place-items-center rounded-md text-muted transition hover:bg-red-50 hover:text-red-600;
+  }
+
+  .dark .review-delete-button:hover {
+    @apply bg-red-950/40 text-red-300;
+  }
+
+  .review-meta-bar {
+    @apply flex h-10 flex-none items-center gap-2 border-b border-line bg-canvas/45 px-5 text-[9px] text-muted;
+  }
+
+  .review-meta-bar > span {
+    @apply whitespace-nowrap;
+  }
+
+  .review-meta-bar select {
+    @apply h-6 max-w-[310px] rounded border border-line bg-panel px-2 text-[9px] text-ink outline-none;
+  }
+
+  .review-meta-bar > i {
+    @apply h-3 w-px bg-line not-italic;
+  }
+
+  .review-meta-bar > small {
+    @apply truncate text-[9px] text-muted;
+  }
+
+  .review-document {
+    @apply min-h-0 flex-1 overflow-hidden;
+  }
+
+  .review-document textarea {
+    @apply h-full w-full resize-none border-0 bg-panel px-8 py-6 font-mono text-[12px] leading-6 text-ink outline-none ring-0;
+    tab-size: 2;
+  }
+
+  .markdown-preview {
+    @apply mx-auto h-full w-full max-w-[860px] overflow-y-auto px-12 py-8 text-[13px] leading-7 text-ink/90;
+  }
+
+  .markdown-preview > :first-child {
+    @apply mt-0;
+  }
+
+  .markdown-preview h1 {
+    @apply mb-5 mt-8 border-b border-line pb-3 text-[24px] font-semibold tracking-[-0.035em] text-ink;
+  }
+
+  .markdown-preview h2 {
+    @apply mb-3 mt-8 text-[18px] font-semibold tracking-[-0.025em] text-ink;
+  }
+
+  .markdown-preview h3 {
+    @apply mb-2 mt-6 text-[14px] font-semibold text-ink;
+  }
+
+  .markdown-preview p {
+    @apply my-3;
+  }
+
+  .markdown-preview ul {
+    @apply my-3 list-disc pl-6;
+  }
+
+  .markdown-preview ol {
+    @apply my-3 list-decimal pl-6;
+  }
+
+  .markdown-preview li {
+    @apply my-1 pl-0.5;
+  }
+
+  .markdown-preview ul.contains-task-list {
+    @apply list-none pl-1;
+  }
+
+  .markdown-preview .task-list-item {
+    @apply flex items-start gap-2;
+  }
+
+  .markdown-preview input[type='checkbox'] {
+    @apply mt-1.5 size-3.5 accent-accent;
+  }
+
+  .markdown-preview blockquote {
+    @apply my-4 border-l-2 border-accent/40 bg-accent/[0.045] px-4 py-1 text-muted;
+  }
+
+  .markdown-preview code {
+    @apply rounded bg-ink/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-ink;
+  }
+
+  .markdown-preview pre {
+    @apply my-4 overflow-x-auto rounded-lg border border-line bg-canvas p-4;
+  }
+
+  .markdown-preview pre code {
+    @apply bg-transparent p-0 leading-5;
+  }
+
+  .markdown-preview a {
+    @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent;
+  }
+
+  .markdown-preview hr {
+    @apply my-7 border-0 border-t border-line;
+  }
+
+  .markdown-preview table {
+    @apply my-4 w-full border-collapse overflow-hidden rounded-lg text-[11px];
+  }
+
+  .markdown-preview th,
+  .markdown-preview td {
+    @apply border border-line px-3 py-2 text-left;
+  }
+
+  .markdown-preview th {
+    @apply bg-canvas font-semibold text-ink;
+  }
+
+  .review-editor-empty {
+    @apply flex h-full flex-col items-center justify-center px-8 text-center;
+  }
+
+  .review-editor-empty > span {
+    @apply grid size-12 place-items-center rounded-xl border border-line bg-canvas text-muted;
+  }
+
+  .review-editor-empty h2 {
+    @apply mt-4 text-base font-semibold text-ink;
+  }
+
+  .review-editor-empty p {
+    @apply mb-4 mt-1.5 text-[11px] text-muted;
+  }
+
 }
 
 @keyframes modal-in {
@@ -1405,6 +1683,8 @@
   .page { padding: 24px 22px 48px; }
   .metric-card { padding: 14px; }
   .data-actions { grid-template-columns: 1fr; }
+  .review-workspace { grid-template-columns: 220px minmax(0, 1fr); }
+  .markdown-preview { padding-left: 32px; padding-right: 32px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

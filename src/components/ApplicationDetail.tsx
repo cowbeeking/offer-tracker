@@ -53,7 +53,7 @@ export function ApplicationDetail({ application, statuses, onClose, onEdit, onDe
             <div>
               <span className="eyebrow">投递详情</span>
               <h2>{application.companyName}</h2>
-              <p>{application.positionName}</p>
+              <div className="detail-position-row"><p>{application.positionName}</p>{application.preferenceOrder && <span className="preference-badge">第 {application.preferenceOrder} 志愿</span>}</div>
             </div>
             <button className="icon-button" onClick={onClose} aria-label="关闭"><X size={18} /></button>
           </div>
@@ -159,10 +159,11 @@ export function ApplicationDetail({ application, statuses, onClose, onEdit, onDe
             </div>
           </section>
 
-          {(application.salary || application.link || application.notes) && (
+          {(application.preferenceOrder || application.salary || application.jobType || application.link || application.notes) && (
             <section className="detail-section">
               <div className="section-heading-row"><h3>岗位信息</h3></div>
               <dl className="detail-definition">
+                {application.preferenceOrder && <><dt>志愿</dt><dd>第 {application.preferenceOrder} 志愿</dd></>}
                 {application.salary && <><dt>薪资</dt><dd>{application.salary}</dd></>}
                 {application.jobType && <><dt>类型</dt><dd>{application.jobType}</dd></>}
                 {application.link && <><dt>链接</dt><dd><button onClick={() => void window.desktopApi?.openExternal(application.link!)}>打开招聘页面 <ArrowUpRight size={13} /></button></dd></>}

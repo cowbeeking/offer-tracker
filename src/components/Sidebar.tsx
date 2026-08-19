@@ -1,4 +1,4 @@
-import { BarChart3, Columns3, LayoutDashboard, ListTodo, Settings } from 'lucide-react'
+import { BarChart3, BookOpenText, Columns3, LayoutDashboard, ListTodo, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import type { PageKey, PersistenceStatus } from '@/types/application'
 
@@ -6,6 +6,7 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: typeof LayoutDashboard }[]
   { key: 'dashboard', label: '概览', icon: LayoutDashboard },
   { key: 'applications', label: '投递记录', icon: ListTodo },
   { key: 'board', label: '流程看板', icon: Columns3 },
+  { key: 'reviews', label: '面试复盘', icon: BookOpenText },
   { key: 'statistics', label: '数据统计', icon: BarChart3 },
 ]
 

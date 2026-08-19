@@ -1,5 +1,5 @@
 import { DEFAULT_STATUSES } from '@/types/application'
-import type { AppStateData, Application, BackupData, StatusHistory } from '@/types/application'
+import type { AppStateData, Application, BackupData, InterviewReview, StatusHistory } from '@/types/application'
 import { createId } from '@/utils/id'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,6 +29,33 @@ function optionalTime(value: unknown): string | undefined {
   const text = optionalString(value)
   if (text && !/^([01]\d|2[0-3]):[0-5]\d$/.test(text)) throw new Error('流程历史时间格式错误')
   return text
+}
+
+function optionalPreference(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  const preference = typeof value === 'string' ? Number(value) : value
+  if (typeof preference !== 'number' || !Number.isInteger(preference) || preference < 1 || preference > 99) {
+    throw new Error('志愿顺序需要是 1 到 99 之间的整数')
+  }
+  return preference
+}
+
+function timestamp(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : Date.now()
+}
+
+function parseReview(value: unknown, applicationIds: Set<string>): InterviewReview {
+  if (!isRecord(value)) throw new Error('面试复盘格式错误')
+  const applicationId = optionalString(value.applicationId)
+  if (typeof value.content !== 'string') throw new Error('面试复盘正文格式错误')
+  return {
+    id: optionalString(value.id) ?? createId(),
+    applicationId: applicationId && applicationIds.has(applicationId) ? applicationId : undefined,
+    title: optionalString(value.title) ?? '未命名面试复盘',
+    content: value.content,
+    createdAt: timestamp(value.createdAt),
+    updatedAt: timestamp(value.updatedAt),
+  }
 }
 
 function parseHistory(value: unknown, applicationId: string): StatusHistory {
@@ -66,6 +93,7 @@ function parseApplication(value: unknown): Application {
     id,
     companyName: requiredString(value.companyName, 'companyName'),
     positionName: requiredString(value.positionName, 'positionName'),
+    preferenceOrder: optionalPreference(value.preferenceOrder),
     applicationDate,
     deadline: value.deadline ? dateString(value.deadline, 'deadline') : undefined,
     status,
@@ -128,9 +156,21 @@ export function parseBackup(raw: string): AppStateData {
     seenIds.add(id)
     return { ...application, id, histories: application.histories.map((history) => ({ ...history, applicationId: id })) }
   })
+  const applicationIds = new Set(applications.map(({ id }) => id))
+  const reviewIds = new Set<string>()
+  const reviews = (Array.isArray(data.reviews) ? data.reviews : []).map((value) => parseReview(value, applicationIds)).map((review) => {
+    if (!reviewIds.has(review.id)) {
+      reviewIds.add(review.id)
+      return review
+    }
+    const id = createId()
+    reviewIds.add(id)
+    return { ...review, id }
+  })
   return {
     version: 1,
     applications,
+    reviews,
     customStatuses: [...customStatuses, ...new Set(discoveredStatuses)],
     theme: data.theme === 'light' || data.theme === 'dark' || data.theme === 'system' ? data.theme : 'system',
     initialized: true,
@@ -143,10 +183,11 @@ function csvCell(value: string | number | undefined): string {
 }
 
 export function applicationsToCsv(applications: Application[]): string {
-  const header = ['公司', '岗位', '投递日期', '截止日期', '当前进度', '地点', '渠道', '岗位类型', '薪资', '链接', '备注']
+  const header = ['公司', '岗位', '志愿顺序', '投递日期', '截止日期', '当前进度', '地点', '渠道', '岗位类型', '薪资', '链接', '备注']
   const rows = applications.map((item) => [
     item.companyName,
     item.positionName,
+    item.preferenceOrder ? `第${item.preferenceOrder}志愿` : undefined,
     item.applicationDate,
     item.deadline,
     item.status,

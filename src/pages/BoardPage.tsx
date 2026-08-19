@@ -23,7 +23,7 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
   const dragAutoScrollVelocityRef = useRef(0)
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
-    return applications.filter((item) => !needle || `${item.companyName} ${item.positionName}`.toLocaleLowerCase().includes(needle))
+    return applications.filter((item) => !needle || `${item.companyName} ${item.positionName} ${item.preferenceOrder ? `第${item.preferenceOrder}志愿` : ''}`.toLocaleLowerCase().includes(needle))
   }, [applications, query])
   const boardStatuses = statuses.filter((status) => status !== '待投递' || visible.some((item) => item.status === status))
 
@@ -161,7 +161,8 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
                       >
                         <button className="card-main" onClick={() => onOpen(application)}>
                           <span className="company-avatar">{application.companyName.slice(0, 1)}</span>
-                          <span><strong>{application.companyName}</strong><small>{application.positionName}</small></span>
+                          <span className="card-copy"><strong>{application.companyName}</strong><small>{application.positionName}</small></span>
+                          {application.preferenceOrder && <span className="preference-badge">第 {application.preferenceOrder} 志愿</span>}
                         </button>
                         <div className="card-meta">
                           <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>

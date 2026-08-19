@@ -8,6 +8,7 @@ function draftFromApplication(application?: Application): ApplicationDraft {
   return {
     companyName: application?.companyName ?? '',
     positionName: application?.positionName ?? '',
+    preferenceOrder: application?.preferenceOrder ? String(application.preferenceOrder) : '',
     applicationDate: application?.applicationDate ?? today,
     deadline: application?.deadline ?? '',
     status: application?.status ?? '已投递',
@@ -49,6 +50,10 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
     }
     if (draft.link && !/^https?:\/\//i.test(draft.link)) {
       setError('招聘链接需要以 http:// 或 https:// 开头。')
+      return
+    }
+    if (draft.preferenceOrder && (!/^\d+$/.test(draft.preferenceOrder) || Number(draft.preferenceOrder) < 1 || Number(draft.preferenceOrder) > 99)) {
+      setError('志愿顺序需要填写 1 到 99 之间的整数。')
       return
     }
     if (draft.deadline && draft.deadline < draft.applicationDate) {
@@ -124,6 +129,10 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
         <label className="field">
           <span>薪资</span>
           <input value={draft.salary} onChange={(event) => setField('salary', event.target.value)} placeholder="例如：25k-40k · 15薪" />
+        </label>
+        <label className="field">
+          <span>志愿顺序</span>
+          <input type="number" min="1" max="99" step="1" value={draft.preferenceOrder} onChange={(event) => setField('preferenceOrder', event.target.value)} placeholder="例如：1（第 1 志愿）" />
         </label>
         <label className="field field-span-2">
           <span>招聘链接</span>

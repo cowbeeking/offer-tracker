@@ -39,10 +39,12 @@ function createWindow(): void {
 app.whenReady().then(() => {
   ipcMain.handle(
     'file:save',
-    async (_event, payload: { content: string; defaultPath: string; type: 'json' | 'csv' }) => {
+    async (_event, payload: { content: string; defaultPath: string; type: 'json' | 'csv' | 'md' }) => {
       const filters = payload.type === 'json'
         ? [{ name: 'JSON 数据', extensions: ['json'] }]
-        : [{ name: 'CSV 表格', extensions: ['csv'] }]
+        : payload.type === 'csv'
+          ? [{ name: 'CSV 表格', extensions: ['csv'] }]
+          : [{ name: 'Markdown 文档', extensions: ['md'] }]
       const result = await dialog.showSaveDialog({ defaultPath: payload.defaultPath, filters })
       if (result.canceled || !result.filePath) return false
       await writeFile(result.filePath, payload.content, 'utf8')

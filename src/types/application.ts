@@ -28,6 +28,7 @@ export interface Application {
   id: string
   companyName: string
   positionName: string
+  preferenceOrder?: number
   applicationDate: string
   deadline?: string
   status: ApplicationStatus
@@ -46,6 +47,7 @@ export interface Application {
 export interface ApplicationDraft {
   companyName: string
   positionName: string
+  preferenceOrder: string
   applicationDate: string
   deadline: string
   status: ApplicationStatus
@@ -59,13 +61,23 @@ export interface ApplicationDraft {
   eventTime: string
 }
 
+export interface InterviewReview {
+  id: string
+  applicationId?: string
+  title: string
+  content: string
+  createdAt: number
+  updatedAt: number
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 export type PersistenceStatus = 'saving' | 'saved' | 'error'
-export type PageKey = 'dashboard' | 'applications' | 'board' | 'statistics' | 'settings'
+export type PageKey = 'dashboard' | 'applications' | 'board' | 'reviews' | 'statistics' | 'settings'
 
 export interface AppStateData {
   version: 1
   applications: Application[]
+  reviews: InterviewReview[]
   customStatuses: string[]
   theme: ThemeMode
   initialized: boolean

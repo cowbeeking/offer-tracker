@@ -11,12 +11,14 @@ import { BoardPage } from '@/pages/BoardPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StatisticsPage } from '@/pages/StatisticsPage'
+import { ReviewsPage } from '@/pages/ReviewsPage'
 import type { Application, ApplicationDraft, PageKey } from '@/types/application'
 
 const PAGE_LABELS: Record<PageKey, string> = {
   dashboard: '概览',
   applications: '投递记录',
   board: '流程看板',
+  reviews: '面试复盘',
   statistics: '数据统计',
   settings: '设置',
 }
@@ -32,6 +34,9 @@ export function App(): JSX.Element {
     addApplication,
     updateApplication,
     deleteApplication,
+    addReview,
+    updateReview,
+    deleteReview,
     updateStatus,
     replaceData,
     clearData,
@@ -174,6 +179,7 @@ export function App(): JSX.Element {
           {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} onAdd={openCreate} />}
           {page === 'applications' && <ApplicationsPage applications={state.applications} statuses={statuses} searchRequest={searchRequest} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onEdit={openEdit} onDelete={setDeleting} />}
           {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onStatusChange={changeStatus} />}
+          {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
           {page === 'statistics' && <StatisticsPage applications={state.applications} />}
           {page === 'settings' && <SettingsPage data={state} onBack={() => navigateTo(lastWorkspacePage)} onReplaceData={replaceData} onClearData={clearData} onRemoveDemo={removeDemoData} onThemeChange={setTheme} onAddStatus={addCustomStatus} onRemoveStatus={removeCustomStatus} onNotify={notify} />}
         </div>

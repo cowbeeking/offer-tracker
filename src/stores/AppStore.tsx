@@ -7,6 +7,7 @@ import type {
   Application,
   ApplicationDraft,
   ApplicationStatus,
+  InterviewReview,
   PersistenceStatus,
   StatusHistory,
   ThemeMode,
@@ -18,6 +19,7 @@ import { createId } from '@/utils/id'
 const EMPTY_STATE: AppStateData = {
   version: 1,
   applications: [],
+  reviews: [],
   customStatuses: [],
   theme: 'system',
   initialized: false,
@@ -28,6 +30,9 @@ type Action =
   | { type: 'ADD_APPLICATION'; draft: ApplicationDraft }
   | { type: 'UPDATE_APPLICATION'; id: string; draft: ApplicationDraft }
   | { type: 'DELETE_APPLICATION'; id: string }
+  | { type: 'ADD_REVIEW'; review: InterviewReview }
+  | { type: 'UPDATE_REVIEW'; id: string; changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>> }
+  | { type: 'DELETE_REVIEW'; id: string }
   | {
       type: 'UPDATE_STATUS'
       id: string
@@ -66,6 +71,7 @@ function applicationFromDraft(draft: ApplicationDraft): Application {
     id,
     companyName: draft.companyName.trim(),
     positionName: draft.positionName.trim(),
+    preferenceOrder: draft.preferenceOrder ? Number(draft.preferenceOrder) : undefined,
     applicationDate: draft.applicationDate,
     deadline: draft.deadline || undefined,
     status: draft.status,
@@ -92,7 +98,14 @@ function applicationFromDraft(draft: ApplicationDraft): Application {
 function reducer(state: AppStateData, action: Action): AppStateData {
   switch (action.type) {
     case 'LOAD':
-      return { ...action.state, initialized: true }
+      return {
+        ...EMPTY_STATE,
+        ...action.state,
+        applications: action.state.applications ?? [],
+        reviews: action.state.reviews ?? [],
+        customStatuses: action.state.customStatuses ?? [],
+        initialized: true,
+      }
     case 'ADD_APPLICATION':
       return { ...state, applications: [applicationFromDraft(action.draft), ...state.applications] }
     case 'UPDATE_APPLICATION':
@@ -117,6 +130,7 @@ function reducer(state: AppStateData, action: Action): AppStateData {
             ...application,
             companyName: action.draft.companyName.trim(),
             positionName: action.draft.positionName.trim(),
+            preferenceOrder: action.draft.preferenceOrder ? Number(action.draft.preferenceOrder) : undefined,
             applicationDate: action.draft.applicationDate,
             deadline: action.draft.deadline || undefined,
             status: action.draft.status,
@@ -133,7 +147,24 @@ function reducer(state: AppStateData, action: Action): AppStateData {
         }),
       }
     case 'DELETE_APPLICATION':
-      return { ...state, applications: state.applications.filter(({ id }) => id !== action.id) }
+      return {
+        ...state,
+        applications: state.applications.filter(({ id }) => id !== action.id),
+        reviews: state.reviews.map((review) => review.applicationId === action.id
+          ? { ...review, applicationId: undefined, updatedAt: Date.now() }
+          : review),
+      }
+    case 'ADD_REVIEW':
+      return { ...state, reviews: [action.review, ...state.reviews] }
+    case 'UPDATE_REVIEW':
+      return {
+        ...state,
+        reviews: state.reviews.map((review) => review.id === action.id
+          ? { ...review, ...action.changes, updatedAt: Date.now() }
+          : review),
+      }
+    case 'DELETE_REVIEW':
+      return { ...state, reviews: state.reviews.filter(({ id }) => id !== action.id) }
     case 'UPDATE_STATUS':
       return {
         ...state,
@@ -156,9 +187,16 @@ function reducer(state: AppStateData, action: Action): AppStateData {
         }),
       }
     case 'REPLACE_DATA':
-      return { ...action.data, initialized: true }
+      return {
+        ...EMPTY_STATE,
+        ...action.data,
+        applications: action.data.applications ?? [],
+        reviews: action.data.reviews ?? [],
+        customStatuses: action.data.customStatuses ?? [],
+        initialized: true,
+      }
     case 'CLEAR_DATA':
-      return { ...state, applications: [] }
+      return { ...state, applications: [], reviews: [] }
     case 'REMOVE_DEMO':
       return { ...state, applications: state.applications.filter(({ isDemo }) => !isDemo) }
     case 'SET_THEME':
@@ -186,6 +224,9 @@ interface AppStoreValue {
   addApplication: (draft: ApplicationDraft) => void
   updateApplication: (id: string, draft: ApplicationDraft) => void
   deleteApplication: (id: string) => void
+  addReview: (review: InterviewReview) => void
+  updateReview: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>>) => void
+  deleteReview: (id: string) => void
   updateStatus: (
     id: string,
     status: ApplicationStatus,
@@ -289,6 +330,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
       addApplication: (draft) => dispatch({ type: 'ADD_APPLICATION', draft }),
       updateApplication: (id, draft) => dispatch({ type: 'UPDATE_APPLICATION', id, draft }),
       deleteApplication: (id) => dispatch({ type: 'DELETE_APPLICATION', id }),
+      addReview: (review) => dispatch({ type: 'ADD_REVIEW', review }),
+      updateReview: (id, changes) => dispatch({ type: 'UPDATE_REVIEW', id, changes }),
+      deleteReview: (id) => dispatch({ type: 'DELETE_REVIEW', id }),
       updateStatus: (id, status, event) => dispatch({ type: 'UPDATE_STATUS', id, status, event }),
       replaceData: (data) => dispatch({ type: 'REPLACE_DATA', data }),
       clearData: () => dispatch({ type: 'CLEAR_DATA' }),
