@@ -6,6 +6,7 @@ import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
 import { MarkdownToolbar } from '@/components/MarkdownToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { Modal } from '@/components/ui/Modal'
 import type { Application, InterviewReview, WorkflowNode } from '@/types/application'
 import { createInterviewReview, createReviewTitle } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
@@ -40,6 +41,9 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const [mode, setMode] = useState<ReviewMode>('live')
   const [deleting, setDeleting] = useState<InterviewReview>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importApplicationId, setImportApplicationId] = useState('')
+  const [importWorkflowNodeId, setImportWorkflowNodeId] = useState('')
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
   const markdownFileInputRef = useRef<HTMLInputElement>(null)
   const applicationById = useMemo(() => new Map(applications.map((item) => [item.id, item])), [applications])
@@ -61,6 +65,9 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     })
   }, [applicationById, query, sortedReviews])
   const selected = reviews.find(({ id }) => id === selectedId)
+  const importApplication = applications.find((application) => application.id === importApplicationId)
+  const importNode = workflowNodes.find((node) => node.id === importWorkflowNodeId)
+  const importLinkExists = Boolean(importApplicationId && importWorkflowNodeId && reviewByApplicationNode.get(`${importApplicationId}:${importWorkflowNodeId}`))
 
   useEffect(() => {
     if (selectedId && reviews.some(({ id }) => id === selectedId)) return
@@ -84,16 +91,39 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
+    if (!importApplication || !importNode) {
+      onNotify('请先选择公司、职位和流程节点', 'error')
+      return
+    }
+    if (reviewByApplicationNode.get(`${importApplication.id}:${importNode.id}`)) {
+      onNotify('这条投递的该流程节点已经有复盘', 'error')
+      return
+    }
     try {
-      const imported = await readMarkdownFile(file, '未命名面试复盘')
-      const review = { ...createInterviewReview(), ...imported }
+      const { content } = await readMarkdownFile(file, '未命名面试复盘')
+      const review = { ...createInterviewReview(importApplication, importNode), content }
       onAdd(review)
       setSelectedId(review.id)
       setMode('live')
+      setImportDialogOpen(false)
+      setImportApplicationId('')
+      setImportWorkflowNodeId('')
       onNotify(`已导入复盘「${review.title}」`)
     } catch (error: unknown) {
       onNotify(error instanceof Error ? error.message : 'Markdown 复盘导入失败', 'error')
     }
+  }
+
+  const chooseReviewFile = (): void => {
+    if (!importApplication || !importNode) {
+      onNotify('请先选择公司、职位和流程节点', 'error')
+      return
+    }
+    if (importLinkExists) {
+      onNotify('这条投递的该流程节点已经有复盘', 'error')
+      return
+    }
+    markdownFileInputRef.current?.click()
   }
 
   const exportReview = async (format: 'md' | 'pdf'): Promise<void> => {
@@ -120,7 +150,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
       <header className="page-heading page-heading-row review-page-heading">
         <div><span className="eyebrow">Interview Notes</span><h1>面试复盘</h1><p>用 Markdown 沉淀问题、回答和下一步行动。</p></div>
         <div className="review-heading-actions">
-          <Button size="sm" icon={<Upload size={14} />} onClick={() => markdownFileInputRef.current?.click()}>导入 .md</Button>
+          <Button size="sm" icon={<Upload size={14} />} onClick={() => setImportDialogOpen(true)}>导入 .md</Button>
           <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addReview}>新建复盘</Button>
           <input ref={markdownFileInputRef} type="file" hidden accept=".md,.markdown,text/markdown" onChange={(event) => void importReview(event)} />
         </div>
@@ -216,6 +246,16 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
       </section>
 
       <ConfirmDialog open={Boolean(deleting)} title="删除这篇面试复盘？" description={deleting ? `「${deleting.title.trim() || '未命名面试复盘'}」将被永久删除，此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
+      <Modal open={importDialogOpen} width="sm" title="导入面试复盘" description="先确定公司、职位和节点，再选择 Markdown 文件。原文件名不会被使用。" onClose={() => setImportDialogOpen(false)}>
+        <form className="review-import-form" onSubmit={(event) => { event.preventDefault(); chooseReviewFile() }}>
+          <div className="review-import-grid">
+            <label className="field"><span>公司与职位 <em>*</em></span><select autoFocus required value={importApplicationId} onChange={(event) => setImportApplicationId(event.target.value)}><option value="">请选择投递</option>{sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}</select></label>
+            <label className="field"><span>流程节点 <em>*</em></span><select required value={importWorkflowNodeId} onChange={(event) => setImportWorkflowNodeId(event.target.value)}><option value="">请选择节点</option>{reviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+          </div>
+          <div className={`review-import-name ${importLinkExists ? 'duplicate' : ''}`}><span>导入后名称</span><strong>{importApplication && importNode ? createReviewTitle(importApplication, importNode) : '选择完整后自动生成'}</strong>{importLinkExists && <small>该投递的这个节点已经有复盘</small>}</div>
+          <footer className="modal-footer"><Button type="button" onClick={() => setImportDialogOpen(false)}>取消</Button><Button type="submit" variant="primary" icon={<Upload size={14} />} disabled={!importApplication || !importNode || importLinkExists}>选择 MD 文件</Button></footer>
+        </form>
+      </Modal>
     </div>
   )
 }
