@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookMarked, Code2, Download, Eye, FileDown, FileText, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { BookMarked, Code2, Download, Eye, FileDown, FileText, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
@@ -10,6 +10,7 @@ import type { KnowledgeNote } from '@/types/application'
 import { createKnowledgeNote } from '@/utils/knowledge'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
 import type { MarkdownEditorHandle } from '@/utils/markdownEditing'
+import { readMarkdownFile } from '@/utils/markdownImport'
 
 interface KnowledgeNotesPageProps {
   notes: KnowledgeNote[]
@@ -37,6 +38,7 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
   const [deleting, setDeleting] = useState<KnowledgeNote>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
+  const markdownFileInputRef = useRef<HTMLInputElement>(null)
   const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes])
   const filteredNotes = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
@@ -55,6 +57,22 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
     onAdd(note)
     setSelectedId(note.id)
     setMode('live')
+  }
+
+  const importNote = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const imported = await readMarkdownFile(file, '未命名知识笔记')
+      const note = { ...createKnowledgeNote(), ...imported }
+      onAdd(note)
+      setSelectedId(note.id)
+      setMode('live')
+      onNotify(`已导入知识笔记「${note.title}」`)
+    } catch (error: unknown) {
+      onNotify(error instanceof Error ? error.message : 'Markdown 知识笔记导入失败', 'error')
+    }
   }
 
   const exportNote = async (format: 'md' | 'pdf'): Promise<void> => {
@@ -80,7 +98,11 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
     <div className="page reviews-page knowledge-page">
       <header className="page-heading page-heading-row review-page-heading">
         <div><span className="eyebrow">Knowledge Base</span><h1>知识笔记</h1><p>用 Markdown 整理技术知识、易错点和延伸阅读。</p></div>
-        <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addNote}>新建笔记</Button>
+        <div className="review-heading-actions">
+          <Button size="sm" icon={<Upload size={14} />} onClick={() => markdownFileInputRef.current?.click()}>导入 .md</Button>
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addNote}>新建笔记</Button>
+          <input ref={markdownFileInputRef} type="file" hidden accept=".md,.markdown,text/markdown" onChange={(event) => void importNote(event)} />
+        </div>
       </header>
 
       <section className={`panel review-workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

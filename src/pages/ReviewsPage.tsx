@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Code2, Download, Eye, FileDown, FileText, Link2, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { Code2, Download, Eye, FileDown, FileText, Link2, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
@@ -10,6 +10,7 @@ import type { Application, InterviewReview, WorkflowNode } from '@/types/applica
 import { createInterviewReview, createReviewTitle } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
 import type { MarkdownEditorHandle } from '@/utils/markdownEditing'
+import { readMarkdownFile } from '@/utils/markdownImport'
 
 interface ReviewsPageProps {
   applications: Application[]
@@ -40,6 +41,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const [deleting, setDeleting] = useState<InterviewReview>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
+  const markdownFileInputRef = useRef<HTMLInputElement>(null)
   const applicationById = useMemo(() => new Map(applications.map((item) => [item.id, item])), [applications])
   const sortedApplications = useMemo(() => [...applications].sort((a, b) =>
     `${a.companyName}${a.positionName}`.localeCompare(`${b.companyName}${b.positionName}`, 'zh-CN')),
@@ -78,6 +80,22 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     setMode('live')
   }
 
+  const importReview = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    try {
+      const imported = await readMarkdownFile(file, '未命名面试复盘')
+      const review = { ...createInterviewReview(), ...imported }
+      onAdd(review)
+      setSelectedId(review.id)
+      setMode('live')
+      onNotify(`已导入复盘「${review.title}」`)
+    } catch (error: unknown) {
+      onNotify(error instanceof Error ? error.message : 'Markdown 复盘导入失败', 'error')
+    }
+  }
+
   const exportReview = async (format: 'md' | 'pdf'): Promise<void> => {
     if (!selected) return
     try {
@@ -101,7 +119,11 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     <div className="page reviews-page">
       <header className="page-heading page-heading-row review-page-heading">
         <div><span className="eyebrow">Interview Notes</span><h1>面试复盘</h1><p>用 Markdown 沉淀问题、回答和下一步行动。</p></div>
-        <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addReview}>新建复盘</Button>
+        <div className="review-heading-actions">
+          <Button size="sm" icon={<Upload size={14} />} onClick={() => markdownFileInputRef.current?.click()}>导入 .md</Button>
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addReview}>新建复盘</Button>
+          <input ref={markdownFileInputRef} type="file" hidden accept=".md,.markdown,text/markdown" onChange={(event) => void importReview(event)} />
+        </div>
       </header>
 
       <section className={`panel review-workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>

@@ -1700,6 +1700,10 @@
     @apply flex-none items-center;
   }
 
+  .review-heading-actions {
+    @apply flex flex-wrap items-center justify-end gap-2;
+  }
+
   .review-workspace {
     @apply grid min-h-0 flex-1 overflow-hidden;
     grid-template-columns: 260px minmax(0, 1fr);
