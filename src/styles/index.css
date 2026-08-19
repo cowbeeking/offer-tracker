@@ -690,6 +690,14 @@
     @apply border-accent/40 bg-accent/5 ring-2 ring-accent/10;
   }
 
+  .kanban-column.drag-blocked {
+    @apply border-red-300 bg-red-50/70 ring-2 ring-red-200/40;
+  }
+
+  .dark .kanban-column.drag-blocked {
+    @apply border-red-800/70 bg-red-950/20 ring-red-900/30;
+  }
+
   .kanban-column > header {
     @apply mb-2.5 flex items-center justify-between px-1 py-1;
   }
@@ -1336,6 +1344,10 @@
     @apply mt-1 text-[9px] text-muted;
   }
 
+  .workflow-heading-actions {
+    @apply flex flex-wrap items-center justify-end gap-2;
+  }
+
   .status-stepper {
     @apply mt-4;
   }
@@ -1349,7 +1361,7 @@
   }
 
   .status-step {
-    @apply flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left transition hover:bg-canvas;
+    @apply flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left;
   }
 
   .status-step-row:not(:last-child)::after {
@@ -1445,6 +1457,14 @@
   .node-progress-editor input,
   .node-progress-editor select {
     @apply h-7 min-w-0 rounded border border-line bg-input px-1.5 text-[9px] text-ink outline-none focus:border-accent/50;
+  }
+
+  .node-state-readonly {
+    @apply flex h-7 items-center rounded border border-line bg-input px-2 text-[9px] font-medium text-muted;
+  }
+
+  .node-state-readonly.active {
+    @apply border-accent/20 bg-accent/5 text-accent;
   }
 
   .reminder-field > span:last-child {
@@ -1575,40 +1595,6 @@
   .dark .toast-success > span { @apply bg-emerald-950/60 text-emerald-300; }
   .dark .toast-error > span { @apply bg-red-950/60 text-red-300; }
 
-  .status-undo {
-    @apply fixed bottom-5 left-1/2 z-[75] flex min-w-[320px] -translate-x-1/2 items-center gap-3 rounded-xl border border-line bg-panel px-3.5 py-3 shadow-2xl;
-    animation: toast-in 180ms ease-out;
-  }
-
-  .status-undo > span {
-    @apply grid size-7 flex-none place-items-center rounded-full bg-emerald-50 text-emerald-600;
-  }
-
-  .dark .status-undo > span {
-    @apply bg-emerald-950/60 text-emerald-300;
-  }
-
-  .status-undo p {
-    @apply min-w-0 flex-1;
-  }
-
-  .status-undo p strong,
-  .status-undo p small {
-    @apply block;
-  }
-
-  .status-undo p strong {
-    @apply text-[11px] font-semibold text-ink;
-  }
-
-  .status-undo p small {
-    @apply mt-0.5 text-[9px] text-muted;
-  }
-
-  .status-undo button {
-    @apply inline-flex flex-none items-center gap-1 rounded-lg border border-line bg-canvas px-3 py-1.5 text-[10px] font-semibold text-accent transition hover:border-accent/30 hover:bg-accent/5;
-  }
-
   .node-reminder {
     @apply fixed bottom-6 right-6 z-[80] flex w-[360px] items-center gap-3 overflow-hidden rounded-2xl border border-amber-200 bg-panel p-4 pr-11 shadow-2xl;
     animation: reminder-in 420ms cubic-bezier(.2,.9,.2,1), reminder-glow 1.8s ease-in-out 450ms 2;
@@ -1712,14 +1698,32 @@
   .review-workspace {
     @apply grid min-h-0 flex-1 overflow-hidden;
     grid-template-columns: 260px minmax(0, 1fr);
+    transition: grid-template-columns 180ms ease;
+  }
+
+  .review-workspace.sidebar-collapsed {
+    grid-template-columns: 42px minmax(0, 1fr);
   }
 
   .review-notes-sidebar {
-    @apply flex min-h-0 flex-col border-r border-line bg-canvas/40;
+    @apply relative flex min-h-0 flex-col border-r border-line bg-canvas/40;
+  }
+
+  .review-sidebar-toggle {
+    @apply absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-md border border-line bg-panel text-muted shadow-sm transition hover:border-accent/25 hover:bg-accent/5 hover:text-accent;
+  }
+
+  .sidebar-collapsed .review-sidebar-toggle {
+    @apply left-1/2 right-auto -translate-x-1/2;
+  }
+
+  .sidebar-collapsed .review-sidebar-head,
+  .sidebar-collapsed .review-note-list {
+    @apply hidden;
   }
 
   .review-sidebar-head {
-    @apply flex-none border-b border-line p-3;
+    @apply flex-none border-b border-line p-3 pr-11;
   }
 
   .review-sidebar-head > div {

@@ -12,6 +12,7 @@ interface BoardPageProps {
   statuses: string[]
   onOpen: (application: Application) => void
   onStatusChange: (id: string, status: string, event: { date: string; time: string; note?: string }) => void
+  onInvalidMove: (message: string) => void
 }
 
 function currentLocalDateTime(): string {
@@ -20,7 +21,7 @@ function currentLocalDateTime(): string {
   return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
-export function BoardPage({ applications, statuses, onOpen, onStatusChange }: BoardPageProps): JSX.Element {
+export function BoardPage({ applications, statuses, onOpen, onStatusChange, onInvalidMove }: BoardPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [overStatus, setOverStatus] = useState<string | null>(null)
@@ -97,7 +98,15 @@ export function BoardPage({ applications, statuses, onOpen, onStatusChange }: Bo
   const handleDrop = (event: DragEvent, status: string): void => {
     event.preventDefault()
     const application = applications.find((item) => item.id === draggedId)
-    if (application && application.status !== status) setPendingDrop({ application, status, scheduledAt: currentLocalDateTime(), note: '' })
+    if (application && application.status !== status) {
+      const currentIndex = statuses.indexOf(application.status)
+      const targetIndex = statuses.indexOf(status)
+      if (currentIndex >= 0 && targetIndex >= 0 && targetIndex < currentIndex) {
+        onInvalidMove('招聘流程不能向前拖动；如需回退，请使用卡片上的“撤销”')
+      } else {
+        setPendingDrop({ application, status, scheduledAt: currentLocalDateTime(), note: '' })
+      }
+    }
     stopDragAutoScroll()
     setDraggedId(null)
     setOverStatus(null)
@@ -138,7 +147,7 @@ export function BoardPage({ applications, statuses, onOpen, onStatusChange }: Bo
   return (
     <div className="page board-page">
       <header className="page-heading">
-        <div><span className="eyebrow">Pipeline board</span><h1>流程看板</h1><p>拖动后填写节点时间；原节点自动完成，误拖可立即撤销。</p></div>
+        <div><span className="eyebrow">Pipeline board</span><h1>流程看板</h1><p>只能向后拖动并填写节点时间；误拖请在投递详情的招聘流程中撤销。</p></div>
       </header>
       <div className="board-toolbar">
         <label className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索看板中的公司 / 岗位" /></label>
@@ -159,9 +168,11 @@ export function BoardPage({ applications, statuses, onOpen, onStatusChange }: Bo
               const items = visible
                 .filter((application) => application.status === status)
                 .sort((first, second) => first.applicationDate.localeCompare(second.applicationDate) || first.createdAt - second.createdAt)
+              const draggedApplication = applications.find((application) => application.id === draggedId)
+              const isEarlierTarget = Boolean(draggedApplication && statuses.indexOf(status) < statuses.indexOf(draggedApplication.status))
               return (
                 <section
-                  className={`kanban-column ${overStatus === status ? 'drag-over' : ''}`}
+                  className={`kanban-column ${overStatus === status ? isEarlierTarget ? 'drag-blocked' : 'drag-over' : ''}`}
                   key={status}
                   onDragOver={(event) => { event.preventDefault(); setOverStatus(status) }}
                   onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOverStatus(null) }}

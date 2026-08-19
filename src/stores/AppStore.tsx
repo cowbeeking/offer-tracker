@@ -33,7 +33,6 @@ type Action =
   | { type: 'LOAD'; state: AppStateData }
   | { type: 'ADD_APPLICATION'; draft: ApplicationDraft }
   | { type: 'UPDATE_APPLICATION'; id: string; draft: ApplicationDraft }
-  | { type: 'RESTORE_APPLICATION'; application: Application }
   | { type: 'DELETE_APPLICATION'; id: string }
   | { type: 'ADD_REVIEW'; review: InterviewReview }
   | { type: 'UPDATE_REVIEW'; id: string; changes: Partial<Pick<InterviewReview, 'applicationId' | 'workflowNodeId' | 'stageName' | 'title' | 'content'>> }
@@ -47,6 +46,7 @@ type Action =
       status: ApplicationStatus
       event?: { date?: string; time?: string; note?: string }
     }
+  | { type: 'UNDO_STATUS'; id: string }
   | { type: 'REPLACE_DATA'; data: AppStateData }
   | { type: 'CLEAR_DATA' }
   | { type: 'REMOVE_DEMO' }
@@ -270,13 +270,6 @@ function reducer(state: AppStateData, action: Action): AppStateData {
           }
         }),
       }
-    case 'RESTORE_APPLICATION':
-      return {
-        ...state,
-        applications: state.applications.map((application) => application.id === action.application.id
-          ? { ...action.application, updatedAt: Date.now(), isDemo: false }
-          : application),
-      }
     case 'DELETE_APPLICATION':
       return {
         ...state,
@@ -354,6 +347,39 @@ function reducer(state: AppStateData, action: Action): AppStateData {
           }
         }),
       }
+    case 'UNDO_STATUS': {
+      const application = state.applications.find((item) => item.id === action.id)
+      if (!application) return state
+      const currentNode = state.workflowNodes.find((node) => node.name === application.status)
+      if (!currentNode) return state
+      const latestCurrentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
+      const previousHistory = latestCurrentHistoryIndex > 0
+        ? [...application.histories.slice(0, latestCurrentHistoryIndex)].reverse().find((history) =>
+            history.status !== application.status && state.workflowNodes.some((node) => node.name === history.status))
+        : undefined
+      const previousNode = previousHistory ? state.workflowNodes.find((node) => node.name === previousHistory.status) : undefined
+      if (!previousNode) return state
+      const now = Date.now()
+      return {
+        ...state,
+        applications: state.applications.map((item) => {
+          if (item.id !== action.id) return item
+          return {
+            ...item,
+            status: previousNode.name,
+            histories: item.histories.filter((_, index) => index !== latestCurrentHistoryIndex),
+            nodeProgress: item.nodeProgress
+              .filter((progress) => progress.workflowNodeId !== currentNode.id)
+              .map((progress) => progress.workflowNodeId === previousNode.id
+                ? { ...progress, state: 'active' as const, updatedAt: now }
+                : progress.state === 'active' ? { ...progress, state: 'completed' as const, updatedAt: now } : progress),
+            isDemo: false,
+            updatedAt: now,
+          }
+        }),
+        reviews: state.reviews.filter((review) => !(review.applicationId === action.id && review.workflowNodeId === currentNode.id)),
+      }
+    }
     case 'REPLACE_DATA': {
       const workflowNodes = normalizeWorkflowNodes(action.data)
       const applications = normalizeApplications(action.data.applications ?? [], workflowNodes)
@@ -434,7 +460,6 @@ interface AppStoreValue {
   statuses: string[]
   addApplication: (draft: ApplicationDraft) => void
   updateApplication: (id: string, draft: ApplicationDraft) => void
-  restoreApplication: (application: Application) => void
   deleteApplication: (id: string) => void
   addReview: (review: InterviewReview) => void
   updateReview: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'workflowNodeId' | 'stageName' | 'title' | 'content'>>) => void
@@ -447,6 +472,7 @@ interface AppStoreValue {
     status: ApplicationStatus,
     event?: { date?: string; time?: string; note?: string },
   ) => void
+  undoStatus: (id: string) => void
   replaceData: (data: AppStateData) => void
   clearData: () => void
   removeDemoData: () => void
@@ -544,7 +570,6 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
       statuses: state.workflowNodes.map((node) => node.name),
       addApplication: (draft) => dispatch({ type: 'ADD_APPLICATION', draft }),
       updateApplication: (id, draft) => dispatch({ type: 'UPDATE_APPLICATION', id, draft }),
-      restoreApplication: (application) => dispatch({ type: 'RESTORE_APPLICATION', application }),
       deleteApplication: (id) => dispatch({ type: 'DELETE_APPLICATION', id }),
       addReview: (review) => dispatch({ type: 'ADD_REVIEW', review }),
       updateReview: (id, changes) => dispatch({ type: 'UPDATE_REVIEW', id, changes }),
@@ -553,6 +578,7 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
       updateKnowledgeNote: (id, changes) => dispatch({ type: 'UPDATE_KNOWLEDGE_NOTE', id, changes }),
       deleteKnowledgeNote: (id) => dispatch({ type: 'DELETE_KNOWLEDGE_NOTE', id }),
       updateStatus: (id, status, event) => dispatch({ type: 'UPDATE_STATUS', id, status, event }),
+      undoStatus: (id) => dispatch({ type: 'UNDO_STATUS', id }),
       replaceData: (data) => dispatch({ type: 'REPLACE_DATA', data }),
       clearData: () => dispatch({ type: 'CLEAR_DATA' }),
       removeDemoData: () => dispatch({ type: 'REMOVE_DEMO' }),

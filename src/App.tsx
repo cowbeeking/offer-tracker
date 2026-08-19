@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, BellRing, Check, Clock3, Plus, RefreshCw, RotateCcw, Search, X } from 'lucide-react'
+import { AlertTriangle, BellRing, Check, Clock3, Plus, RefreshCw, Search, X } from 'lucide-react'
 import { ApplicationDetail } from '@/components/ApplicationDetail'
 import { ApplicationModal } from '@/components/ApplicationModal'
 import { Sidebar } from '@/components/Sidebar'
@@ -60,7 +60,6 @@ export function App(): JSX.Element {
     statuses,
     addApplication,
     updateApplication,
-    restoreApplication,
     deleteApplication,
     addReview,
     updateReview,
@@ -69,6 +68,7 @@ export function App(): JSX.Element {
     updateKnowledgeNote,
     deleteKnowledgeNote,
     updateStatus,
+    undoStatus,
     replaceData,
     clearData,
     removeDemoData,
@@ -87,7 +87,6 @@ export function App(): JSX.Element {
   const [reviewOpenRequest, setReviewOpenRequest] = useState<{ id: string; token: number }>()
   const [searchRequest, setSearchRequest] = useState(0)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' }>()
-  const [statusUndo, setStatusUndo] = useState<{ application: Application; toStatus: string }>()
   const [reminderAlert, setReminderAlert] = useState<{ application: Application; node: WorkflowNode; scheduledAt: string }>()
   const presentedReminderKeys = useRef(new Set<string>())
   const reminderTimers = useRef(new Map<string, number>())
@@ -157,12 +156,6 @@ export function App(): JSX.Element {
     const timer = window.setTimeout(() => setToast(undefined), 2800)
     return () => window.clearTimeout(timer)
   }, [toast])
-
-  useEffect(() => {
-    if (!statusUndo) return
-    const timer = window.setTimeout(() => setStatusUndo(undefined), 8000)
-    return () => window.clearTimeout(timer)
-  }, [statusUndo])
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
@@ -255,26 +248,33 @@ export function App(): JSX.Element {
     notify('投递记录已删除')
   }
 
-  const changeStatus = (id: string, status: string, event?: { date?: string; time?: string; note?: string }): void => {
-    const current = state.applications.find((item) => item.id === id)
-    if (!current || current.status === status) return
-    updateStatus(id, status, event)
-    notify(`已将 ${current.companyName} 更新为「${status}」`)
-  }
-
   const moveBoardCard = (id: string, status: string, event: { date: string; time: string; note?: string }): void => {
     const current = state.applications.find((item) => item.id === id)
     if (!current || current.status === status) return
-    setStatusUndo({ application: current, toStatus: status })
     updateStatus(id, status, event)
-    setToast(undefined)
+    notify(`已将 ${current.companyName} 更新为「${status}」，原节点已完成`)
   }
 
-  const undoBoardMove = (): void => {
-    if (!statusUndo) return
-    restoreApplication(statusUndo.application)
-    setStatusUndo(undefined)
-    notify(`已撤销，${statusUndo.application.companyName} 回到「${statusUndo.application.status}」`)
+  const undoApplicationStatus = (application: Application): void => {
+    const currentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
+    const previousHistory = currentHistoryIndex > 0
+      ? [...application.histories.slice(0, currentHistoryIndex)].reverse().find((history) =>
+          history.status !== application.status && state.workflowNodes.some((node) => node.name === history.status))
+      : undefined
+    if (!previousHistory) {
+      notify('当前已经是该投递的第一个节点，无法继续撤销', 'error')
+      return
+    }
+    const currentNode = state.workflowNodes.find((node) => node.name === application.status)
+    if (currentNode) {
+      const timerKey = `${application.id}:${currentNode.id}`
+      const timer = reminderTimers.current.get(timerKey)
+      if (timer !== undefined) window.clearTimeout(timer)
+      reminderTimers.current.delete(timerKey)
+      if (reminderAlert?.application.id === application.id && reminderAlert.node.id === currentNode.id) setReminderAlert(undefined)
+    }
+    undoStatus(application.id)
+    notify(`已撤销到「${previousHistory.status}」，并清理后一节点的待办与复盘`)
   }
 
   const openApplicationReview = (application: Application, node: WorkflowNode): void => {
@@ -321,7 +321,7 @@ export function App(): JSX.Element {
         <div className={`page-container ${page === 'settings' ? 'settings-container' : ''}`}>
           {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} workflowNodes={state.workflowNodes} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} />}
           {page === 'applications' && <ApplicationsPage applications={state.applications} statuses={statuses} searchRequest={searchRequest} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onEdit={openEdit} onDelete={setDeleting} />}
-          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onOpen={(item) => setDetailId(item.id)} onStatusChange={moveBoardCard} />}
+          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onOpen={(item) => setDetailId(item.id)} onStatusChange={moveBoardCard} onInvalidMove={(message) => notify(message, 'error')} />}
           {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} workflowNodes={state.workflowNodes} openRequest={reviewOpenRequest} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
           {page === 'knowledge' && <KnowledgeNotesPage notes={state.knowledgeNotes} onAdd={addKnowledgeNote} onUpdate={updateKnowledgeNote} onDelete={deleteKnowledgeNote} onNotify={notify} />}
           {page === 'statistics' && <StatisticsPage applications={state.applications} />}
@@ -330,18 +330,13 @@ export function App(): JSX.Element {
       </main>
 
       <ApplicationModal open={formOpen} application={editing} statuses={statuses} companies={companies} onSave={saveApplication} onClose={() => { setFormOpen(false); setEditing(undefined) }} />
-      <ApplicationDetail application={detailApplication} workflowNodes={state.workflowNodes} reviews={state.reviews} onClose={() => setDetailId(undefined)} onEdit={openEdit} onDelete={setDeleting} onStatusChange={changeStatus} onReview={openApplicationReview} onNodeProgress={handleNodeProgress} />
+      <ApplicationDetail application={detailApplication} workflowNodes={state.workflowNodes} reviews={state.reviews} onClose={() => setDetailId(undefined)} onEdit={openEdit} onDelete={setDeleting} onUndo={undoApplicationStatus} onReview={openApplicationReview} onNodeProgress={handleNodeProgress} />
       <ConfirmDialog open={Boolean(deleting)} title="删除这条投递记录？" description={deleting ? `将永久删除「${deleting.companyName} · ${deleting.positionName}」及全部流程历史，此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
       {reminderAlert && <div className="node-reminder" role="alertdialog" aria-label="招聘节点提醒">
         <button className="node-reminder-close" aria-label="关闭提醒" onClick={() => setReminderAlert(undefined)}><X size={14} /></button>
         <span className="node-reminder-icon"><BellRing size={21} /></span>
         <div className="node-reminder-copy"><small>节点提醒</small><strong>{reminderAlert.application.companyName} · {reminderAlert.node.name}</strong><p>{reminderAlert.application.positionName}</p><time><Clock3 size={12} />{new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(reminderAlert.scheduledAt))}</time></div>
         <button className="node-reminder-open" onClick={() => { setDetailId(reminderAlert.application.id); setReminderAlert(undefined) }}>查看节点</button>
-      </div>}
-      {statusUndo && <div className="status-undo" role="status">
-        <span><Check size={15} /></span>
-        <p><strong>已移动到「{statusUndo.toStatus}」</strong><small>原节点已标记为完成</small></p>
-        <button onClick={undoBoardMove}><RotateCcw size={13} />撤销</button>
       </div>}
       {toast && <div className={`toast ${toast.tone === 'success' ? 'toast-success' : 'toast-error'}`}><span>{toast.tone === 'success' ? <Check size={15} /> : <X size={15} />}</span>{toast.message}</div>}
     </div>

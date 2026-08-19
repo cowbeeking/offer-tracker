@@ -1,14 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
-import { ArrowUpRight, BookCheck, BookOpenText, Calendar, Check, Clock3, MapPin, Pencil, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo } from 'react'
+import { ArrowUpRight, BookCheck, BookOpenText, Calendar, Check, Clock3, MapPin, Pencil, RotateCcw, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { StatusTag } from '@/components/StatusTag'
 import type { Application, ApplicationNodeProgress, InterviewReview, WorkflowNode } from '@/types/application'
-import { formatChineseDate, toDateInput } from '@/utils/date'
-
-function currentTimeInput(): string {
-  const now = new Date()
-  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-}
+import { formatChineseDate } from '@/utils/date'
 
 interface ApplicationDetailProps {
   application?: Application
@@ -17,20 +12,12 @@ interface ApplicationDetailProps {
   onClose: () => void
   onEdit: (application: Application) => void
   onDelete: (application: Application) => void
-  onStatusChange: (id: string, status: string, event: { date: string; time?: string; note?: string }) => void
+  onUndo: (application: Application) => void
   onReview: (application: Application, node: WorkflowNode) => void
   onNodeProgress: (applicationId: string, node: WorkflowNode, changes: Partial<Omit<ApplicationNodeProgress, 'workflowNodeId' | 'updatedAt'>>) => void
 }
 
-export function ApplicationDetail({ application, workflowNodes, reviews, onClose, onEdit, onDelete, onStatusChange, onReview, onNodeProgress }: ApplicationDetailProps): JSX.Element | null {
-  const [nextDate, setNextDate] = useState(toDateInput())
-  const [nextTime, setNextTime] = useState(currentTimeInput)
-  const [note, setNote] = useState('')
-  const mainNodes = useMemo(() => workflowNodes.filter((node) => !node.isTerminal), [workflowNodes])
-  const mainStatuses = useMemo(() => mainNodes.map((node) => node.name), [mainNodes])
-  const mainCurrentIndex = application ? mainStatuses.indexOf(application.status) : -1
-  const terminalStatus = application ? workflowNodes.some((node) => node.name === application.status && node.isTerminal) || application.status === 'Offer' : false
-  const nextStatus = mainCurrentIndex >= 0 && !terminalStatus ? mainNodes[mainCurrentIndex + 1]?.name : undefined
+export function ApplicationDetail({ application, workflowNodes, reviews, onClose, onEdit, onDelete, onUndo, onReview, onNodeProgress }: ApplicationDetailProps): JSX.Element | null {
   const experiencedNodes = useMemo(() => (application?.nodeProgress ?? []).flatMap((progress) => {
     const node = workflowNodes.find((item) => item.id === progress.workflowNodeId)
     return node ? [{ node, progress }] : []
@@ -49,10 +36,9 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
   }, [onClose])
 
   if (!application) return null
-  const advance = (status: string): void => {
-    onStatusChange(application.id, status, { date: nextDate, time: nextTime || undefined, note: note || undefined })
-    setNote('')
-  }
+  const currentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
+  const canUndo = currentHistoryIndex > 0 && application.histories.slice(0, currentHistoryIndex).some((history) =>
+    history.status !== application.status && workflowNodes.some((node) => node.name === history.status))
 
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={onClose}>
@@ -82,9 +68,12 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
             <div className="section-heading-row">
               <div>
                 <h3>招聘流程</h3>
-                <p className="section-description">仅显示实际经历的节点，流程推进后自动增量记录</p>
+                <p className="section-description">节点只读；请在流程看板向后拖动，或在此撤销上一节点</p>
               </div>
-              <StatusTag status={application.status} />
+              <div className="workflow-heading-actions">
+                <StatusTag status={application.status} />
+                {canUndo && <Button size="sm" icon={<RotateCcw size={13} />} onClick={() => onUndo(application)}>撤销到上一节点</Button>}
+              </div>
             </div>
             <div className="status-stepper">
               {experiencedNodes.map(({ node, progress }, index) => {
@@ -96,7 +85,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
                 return (
                   <div key={node.id} className={`status-step-row ${isCurrent ? 'current' : ''} ${isPast ? 'past' : ''}`}>
                     <div className="status-step-primary">
-                      <button className="status-step" onClick={() => advance(status)} title={`更新为${status}`}>
+                      <div className="status-step">
                         <span className="step-marker">
                           {effectiveState === 'completed' ? <Check size={11} /> : isCurrent ? <span className="current-marker" /> : <span>{index + 1}</span>}
                         </span>
@@ -105,7 +94,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
                           <small>{node.isTerminal ? '结束状态' : effectiveState === 'completed' ? '已完成' : '正在进行'}</small>
                         </span>
                         {isCurrent && <span className="current-label">当前</span>}
-                      </button>
+                      </div>
                       {node.hasReview && <button
                         className={`node-review-action ${review ? 'completed' : 'pending'}`}
                         onClick={() => onReview(application, node)}
@@ -114,32 +103,13 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
                     </div>
                     <div className="node-progress-editor">
                       <label><span>节点时间</span><input type="datetime-local" step="60" value={progress.scheduledAt ?? ''} onChange={(event) => onNodeProgress(application.id, node, { scheduledAt: event.target.value || undefined })} /></label>
-                      <label><span>状态</span><select value={effectiveState ?? ''} onChange={(event) => onNodeProgress(application.id, node, { state: event.target.value as 'active' | 'completed' })}><option value="" disabled>未设置</option><option value="active">进行中</option><option value="completed">已完成</option></select></label>
+                      <label><span>状态</span><strong className={`node-state-readonly ${effectiveState}`}>{effectiveState === 'completed' ? '已完成' : '进行中'}</strong></label>
                       <label className="reminder-field"><span>提前提醒{progress.reminderSentAt ? ' · 已提醒' : ''}</span><span><input type="number" min="0" step="1" value={progress.reminderMinutesBefore ?? ''} onChange={(event) => onNodeProgress(application.id, node, { reminderMinutesBefore: event.target.value === '' ? undefined : Math.max(0, Number(event.target.value)) })} placeholder="不提醒" /><i>分钟</i></span></label>
                     </div>
                   </div>
                 )
               })}
             </div>
-          </section>
-
-          <section className="detail-section advance-panel">
-            <div className="section-heading-row">
-              <div>
-                <span className="section-kicker">Next action</span>
-                <h3>更新进度</h3>
-              </div>
-            </div>
-            <div className="advance-fields">
-              <label className="field"><span>事件日期</span><input type="date" value={nextDate} onChange={(event) => setNextDate(event.target.value)} /></label>
-              <label className="field"><span>时间</span><input type="time" value={nextTime} onChange={(event) => setNextTime(event.target.value)} /></label>
-            </div>
-            <label className="field"><span>备注</span><input value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：收到笔试通知" /></label>
-            {nextStatus ? (
-              <Button variant="primary" className="advance-button" onClick={() => advance(nextStatus)}>
-                进入下一阶段 · {nextStatus}
-              </Button>
-            ) : <p className="detail-hint">当前已是流程中的最后一个阶段。</p>}
           </section>
 
           <section className="detail-section">

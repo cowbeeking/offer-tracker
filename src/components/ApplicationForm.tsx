@@ -155,8 +155,8 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
           <input type="date" value={draft.deadline} onChange={(event) => setField('deadline', event.target.value)} />
         </label>
         <label className="field">
-          <span>当前状态</span>
-          <select value={draft.status} onChange={(event) => setField('status', event.target.value)}>
+          <span>{application ? '当前状态（请在流程看板拖动）' : '初始状态'}</span>
+          <select disabled={Boolean(application)} value={draft.status} onChange={(event) => setField('status', event.target.value)}>
             {statuses.map((status) => <option value={status} key={status}>{status}</option>)}
           </select>
         </label>

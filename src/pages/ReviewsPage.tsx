@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Code2, Download, Eye, FileDown, FileText, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
+import { Code2, Download, Eye, FileDown, FileText, Link2, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/Button'
@@ -35,6 +35,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<ReviewMode>('live')
   const [deleting, setDeleting] = useState<InterviewReview>()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const applicationById = useMemo(() => new Map(applications.map((item) => [item.id, item])), [applications])
   const sortedApplications = useMemo(() => [...applications].sort((a, b) =>
     `${a.companyName}${a.positionName}`.localeCompare(`${b.companyName}${b.positionName}`, 'zh-CN')),
@@ -99,8 +100,11 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
         <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addReview}>新建复盘</Button>
       </header>
 
-      <section className="panel review-workspace">
+      <section className={`panel review-workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <aside className="review-notes-sidebar">
+          <button className="review-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} title={sidebarCollapsed ? '展开全部笔记' : '向左折叠全部笔记'} aria-label={sidebarCollapsed ? '展开全部笔记' : '折叠全部笔记'}>
+            {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+          </button>
           <div className="review-sidebar-head">
             <div><strong>全部笔记</strong><span>{reviews.length}</span></div>
             <label className="review-search"><Search size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索复盘内容" /></label>

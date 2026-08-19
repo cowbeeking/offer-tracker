@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BookMarked, Code2, Download, Eye, FileDown, FileText, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
+import { BookMarked, Code2, Download, Eye, FileDown, FileText, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/Button'
@@ -32,6 +32,7 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<EditorMode>('live')
   const [deleting, setDeleting] = useState<KnowledgeNote>()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes])
   const filteredNotes = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
@@ -78,8 +79,11 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
         <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addNote}>新建笔记</Button>
       </header>
 
-      <section className="panel review-workspace">
+      <section className={`panel review-workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <aside className="review-notes-sidebar">
+          <button className="review-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} title={sidebarCollapsed ? '展开全部笔记' : '向左折叠全部笔记'} aria-label={sidebarCollapsed ? '展开全部笔记' : '折叠全部笔记'}>
+            {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+          </button>
           <div className="review-sidebar-head">
             <div><strong>全部笔记</strong><span>{notes.length}</span></div>
             <label className="review-search"><Search size={14} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索知识笔记" /></label>
