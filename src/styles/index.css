@@ -1120,28 +1120,44 @@
     @apply col-span-2;
   }
 
-  .secondary-preference {
+  .additional-preferences {
     @apply rounded-lg border border-dashed border-line bg-canvas/45 p-3;
   }
 
-  .secondary-preference-head {
+  .additional-preferences-head {
     @apply flex items-center justify-between gap-4;
   }
 
-  .secondary-preference-head > div {
+  .additional-preferences-head > div {
     @apply flex min-w-0 flex-col;
   }
 
-  .secondary-preference-head strong {
+  .additional-preferences-head strong {
     @apply text-[11px] font-medium text-ink;
   }
 
-  .secondary-preference-head span {
+  .additional-preferences-head span {
     @apply mt-0.5 text-[9px] leading-4 text-muted;
   }
 
-  .secondary-preference-field {
-    @apply mt-3 border-t border-line pt-3;
+  .additional-preference-list {
+    @apply mt-3 flex flex-col gap-3 border-t border-line pt-3;
+  }
+
+  .additional-preference-input {
+    @apply flex items-center gap-2;
+  }
+
+  .additional-preference-input > input {
+    @apply min-w-0 flex-1;
+  }
+
+  .additional-preference-input > button {
+    @apply grid size-9 flex-none place-items-center rounded-md border border-line bg-panel text-muted transition hover:border-red-200 hover:bg-red-50 hover:text-red-600;
+  }
+
+  .dark .additional-preference-input > button:hover {
+    @apply border-red-900 bg-red-950/40 text-red-300;
   }
 
   .field-group {
@@ -1675,11 +1691,92 @@
   }
 
   .markdown-prose pre {
-    @apply my-4 overflow-x-auto rounded-lg border border-line bg-canvas p-4;
+    @apply my-4 overflow-hidden rounded-lg border border-line bg-canvas p-0;
   }
 
   .markdown-prose pre code {
-    @apply bg-transparent p-0 leading-5;
+    @apply block overflow-x-auto bg-transparent p-4 font-mono text-[11px] leading-5;
+  }
+
+  .markdown-prose pre code[data-language]::before {
+    content: attr(data-language);
+    @apply -mx-4 -mt-4 mb-3 block border-b border-line bg-ink/[0.035] px-4 py-1.5 font-mono text-[9px] font-semibold text-muted;
+  }
+
+  .markdown-prose .hljs-comment,
+  .markdown-prose .hljs-quote {
+    color: #77827c;
+  }
+
+  .markdown-prose .hljs-keyword,
+  .markdown-prose .hljs-selector-tag,
+  .markdown-prose .hljs-built_in,
+  .markdown-prose .hljs-name {
+    color: #8d3f73;
+  }
+
+  .markdown-prose .hljs-string,
+  .markdown-prose .hljs-regexp,
+  .markdown-prose .hljs-addition,
+  .markdown-prose .hljs-attribute {
+    color: #2f7156;
+  }
+
+  .markdown-prose .hljs-number,
+  .markdown-prose .hljs-literal,
+  .markdown-prose .hljs-symbol,
+  .markdown-prose .hljs-bullet {
+    color: #a05a24;
+  }
+
+  .markdown-prose .hljs-title,
+  .markdown-prose .hljs-section,
+  .markdown-prose .hljs-function .hljs-title {
+    color: #2d5f91;
+  }
+
+  .markdown-prose .hljs-type,
+  .markdown-prose .hljs-class .hljs-title,
+  .markdown-prose .hljs-variable,
+  .markdown-prose .hljs-template-variable {
+    color: #6852a3;
+  }
+
+  .markdown-prose .hljs-meta,
+  .markdown-prose .hljs-doctag {
+    color: #936b22;
+  }
+
+  .dark .markdown-prose .hljs-comment,
+  .dark .markdown-prose .hljs-quote { color: #84928b; }
+  .dark .markdown-prose .hljs-keyword,
+  .dark .markdown-prose .hljs-selector-tag,
+  .dark .markdown-prose .hljs-built_in,
+  .dark .markdown-prose .hljs-name { color: #df91c2; }
+  .dark .markdown-prose .hljs-string,
+  .dark .markdown-prose .hljs-regexp,
+  .dark .markdown-prose .hljs-addition,
+  .dark .markdown-prose .hljs-attribute { color: #84c6a1; }
+  .dark .markdown-prose .hljs-number,
+  .dark .markdown-prose .hljs-literal,
+  .dark .markdown-prose .hljs-symbol,
+  .dark .markdown-prose .hljs-bullet { color: #e3aa72; }
+  .dark .markdown-prose .hljs-title,
+  .dark .markdown-prose .hljs-section,
+  .dark .markdown-prose .hljs-function .hljs-title { color: #89b9e7; }
+  .dark .markdown-prose .hljs-type,
+  .dark .markdown-prose .hljs-class .hljs-title,
+  .dark .markdown-prose .hljs-variable,
+  .dark .markdown-prose .hljs-template-variable { color: #b6a1ea; }
+  .dark .markdown-prose .hljs-meta,
+  .dark .markdown-prose .hljs-doctag { color: #d5b16f; }
+
+  .markdown-prose .hljs-emphasis {
+    @apply italic;
+  }
+
+  .markdown-prose .hljs-strong {
+    @apply font-semibold;
   }
 
   .markdown-prose a {

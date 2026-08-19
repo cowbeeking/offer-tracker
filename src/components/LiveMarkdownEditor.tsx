@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MarkdownContent } from '@/components/MarkdownContent'
 
 interface MarkdownBlock {
   start: number
@@ -15,44 +14,110 @@ interface LiveMarkdownEditorProps {
   onChange: (value: string) => void
 }
 
+interface SourceLine {
+  start: number
+  end: number
+  text: string
+}
+
+const LIST_ITEM_PATTERN = /^\s*(?:[-+*]|\d+[.)])\s+/
+const TABLE_DIVIDER_PATTERN = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/
+
+function sourceLines(source: string): SourceLine[] {
+  const lines: SourceLine[] = []
+  let cursor = 0
+  while (cursor < source.length) {
+    const newline = source.indexOf('\n', cursor)
+    const rawEnd = newline === -1 ? source.length : newline
+    const end = rawEnd > cursor && source[rawEnd - 1] === '\r' ? rawEnd - 1 : rawEnd
+    lines.push({ start: cursor, end, text: source.slice(cursor, end) })
+    cursor = newline === -1 ? source.length : newline + 1
+  }
+  return lines
+}
+
 function parseMarkdownBlocks(source: string): MarkdownBlock[] {
   if (!source) return [{ start: 0, end: 0, text: '' }]
+  const lines = sourceLines(source)
   const blocks: MarkdownBlock[] = []
-  let blockStart = 0
-  let cursor = 0
-  let fenceMarker = ''
+  const addBlock = (startIndex: number, endIndex: number): void => {
+    const start = lines[startIndex].start
+    const end = lines[endIndex - 1].end
+    blocks.push({ start, end, text: source.slice(start, end) })
+  }
 
-  while (cursor < source.length) {
-    const lineStart = cursor
-    const newline = source.indexOf('\n', cursor)
-    const lineEnd = newline === -1 ? source.length : newline + 1
-    const line = source.slice(lineStart, lineEnd)
-    const trimmed = line.trim()
-    const fence = /^(`{3,}|~{3,})/.exec(trimmed)?.[1]
-
-    if (fence) {
-      if (!fenceMarker) fenceMarker = fence[0]
-      else if (fence[0] === fenceMarker) fenceMarker = ''
+  let index = 0
+  while (index < lines.length) {
+    const line = lines[index]
+    const trimmed = line.text.trim()
+    if (!trimmed) {
+      index += 1
+      continue
     }
 
-    cursor = lineEnd
-    if (!fenceMarker && trimmed === '') {
-      const contentEnd = lineStart > blockStart && source[lineStart - 1] === '\n' ? lineStart - 1 : lineStart
-      if (contentEnd > blockStart) {
-        blocks.push({ start: blockStart, end: contentEnd, text: source.slice(blockStart, contentEnd) })
+    const openingFence = /^\s*(`{3,}|~{3,})/.exec(line.text)?.[1]
+    if (openingFence) {
+      const marker = openingFence[0]
+      const minimumLength = openingFence.length
+      let endIndex = index + 1
+      while (endIndex < lines.length) {
+        const closingFence = /^\s*(`+|~+)\s*$/.exec(lines[endIndex].text)?.[1]
+        endIndex += 1
+        if (closingFence && closingFence[0] === marker && closingFence.length >= minimumLength) break
       }
-      blockStart = cursor
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
     }
+
+    if (index + 1 < lines.length && line.text.includes('|') && TABLE_DIVIDER_PATTERN.test(lines[index + 1].text)) {
+      let endIndex = index + 2
+      while (endIndex < lines.length && lines[endIndex].text.trim() && lines[endIndex].text.includes('|')) endIndex += 1
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
+    }
+
+    if (index + 1 < lines.length && /^\s*(?:={3,}|-{3,})\s*$/.test(lines[index + 1].text)) {
+      addBlock(index, index + 2)
+      index += 2
+      continue
+    }
+
+    if (LIST_ITEM_PATTERN.test(line.text)) {
+      let endIndex = index + 1
+      while (endIndex < lines.length) {
+        const next = lines[endIndex]
+        if (!next.text.trim()) break
+        if (!LIST_ITEM_PATTERN.test(next.text) && !/^(?:\s{2,}|\t)\S/.test(next.text)) break
+        endIndex += 1
+      }
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
+    }
+
+    if (/^\s*>/.test(line.text)) {
+      let endIndex = index + 1
+      while (endIndex < lines.length && /^\s*>/.test(lines[endIndex].text)) endIndex += 1
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
+    }
+
+    if (/^(?: {4}|\t)/.test(line.text)) {
+      let endIndex = index + 1
+      while (endIndex < lines.length && /^(?: {4}|\t)/.test(lines[endIndex].text)) endIndex += 1
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
+    }
+
+    addBlock(index, index + 1)
+    index += 1
   }
 
-  if (blockStart < source.length) {
-    let contentEnd = source.length
-    while (contentEnd > blockStart && source[contentEnd - 1] === '\n') contentEnd -= 1
-    if (contentEnd > blockStart) {
-      blocks.push({ start: blockStart, end: contentEnd, text: source.slice(blockStart, contentEnd) })
-    }
-  }
-  return blocks.length ? blocks : [{ start: 0, end: source.length, text: source }]
+  return blocks.length ? blocks : [{ start: source.length, end: source.length, text: '' }]
 }
 
 function editableEnd(text: string): number {
@@ -158,7 +223,7 @@ export function LiveMarkdownEditor({ documentId, value, onChange }: LiveMarkdown
                   tabIndex={0}
                   onClick={() => activate(block)}
                   onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') activate(block) }}
-                ><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>{block.text}</ReactMarkdown></div>}
+                ><MarkdownContent source={block.text} /></div>}
           </div>
         )
       })}

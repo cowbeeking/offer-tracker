@@ -34,8 +34,8 @@ function optionalTime(value: unknown): string | undefined {
 function optionalPreference(value: unknown): number | undefined {
   if (value === undefined || value === null || value === '') return undefined
   const preference = typeof value === 'string' ? Number(value) : value
-  if (typeof preference !== 'number' || !Number.isInteger(preference) || preference < 1 || preference > 99) {
-    throw new Error('志愿顺序需要是 1 到 99 之间的整数')
+  if (typeof preference !== 'number' || !Number.isInteger(preference) || preference < 1) {
+    throw new Error('志愿顺序需要是大于 0 的整数')
   }
   return preference
 }

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Code2, Download, Eye, FileDown, FileText, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
+import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { Application, InterviewReview } from '@/types/application'
@@ -160,7 +159,7 @@ export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdat
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
             </div>
             <div className={`review-document mode-${mode}`}>
-              {mode === 'preview' && <article className="markdown-preview markdown-prose"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>{selected.content}</ReactMarkdown></article>}
+              {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selected.content} /></article>}
               {mode === 'source' && <textarea value={selected.content} onChange={(event) => onUpdate(selected.id, { content: event.target.value })} spellCheck={false} aria-label="Markdown 源码编辑器" />}
               {mode === 'live' && <LiveMarkdownEditor documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
             </div>

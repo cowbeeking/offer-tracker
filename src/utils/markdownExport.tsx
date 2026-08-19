@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from 'react-dom/server'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MarkdownContent } from '@/components/MarkdownContent'
 
 function normalizedFileName(title: string, fallback: string, extension: 'md' | 'pdf'): string {
   const normalized = title.trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ')
@@ -28,7 +27,7 @@ function escapeHtml(value: string): string {
 
 function printableHtml(title: string, content: string): string {
   const rendered = renderToStaticMarkup(
-    <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>,
+    <MarkdownContent source={content} />,
   )
   return `<!doctype html>
 <html lang="zh-CN">
@@ -48,8 +47,16 @@ function printableHtml(title: string, content: string): string {
     li { margin: 3px 0; }
     blockquote { margin-left: 0; padding: 7px 14px; border-left: 3px solid #2f5b4b; background: #f4f7f5; color: #5f6964; }
     code { padding: 2px 5px; border-radius: 4px; background: #f0f2f0; font: 12px/1.6 Consolas, monospace; }
-    pre { overflow-wrap: anywhere; white-space: pre-wrap; padding: 14px; border: 1px solid #dfe3df; border-radius: 7px; background: #f7f8f7; }
-    pre code { padding: 0; background: transparent; }
+    pre { overflow: hidden; padding: 0; border: 1px solid #dfe3df; border-radius: 7px; background: #f7f8f7; }
+    pre code { display: block; overflow-wrap: anywhere; white-space: pre-wrap; padding: 14px; background: transparent; }
+    pre code[data-language]::before { content: attr(data-language); display: block; margin: -14px -14px 11px; padding: 5px 14px; border-bottom: 1px solid #dfe3df; background: #eef1ef; color: #6f7974; font-size: 10px; font-weight: 600; }
+    .hljs-comment, .hljs-quote { color: #77827c; }
+    .hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-name { color: #8d3f73; }
+    .hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute { color: #2f7156; }
+    .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #a05a24; }
+    .hljs-title, .hljs-section, .hljs-function .hljs-title { color: #2d5f91; }
+    .hljs-type, .hljs-class .hljs-title, .hljs-variable, .hljs-template-variable { color: #6852a3; }
+    .hljs-meta, .hljs-doctag { color: #936b22; }
     table { width: 100%; border-collapse: collapse; font-size: 12px; }
     th, td { padding: 7px 9px; border: 1px solid #dfe3df; text-align: left; }
     th { background: #f4f6f4; }

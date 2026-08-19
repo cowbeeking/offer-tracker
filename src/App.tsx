@@ -136,15 +136,15 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deleting, detailId, formOpen, navigateTo, openCreate, page])
 
-  const saveApplication = (draft: ApplicationDraft, secondaryDraft?: ApplicationDraft): void => {
+  const saveApplication = (draft: ApplicationDraft, additionalDrafts: ApplicationDraft[] = []): void => {
     if (editing) {
       updateApplication(editing.id, draft)
-      if (secondaryDraft) addApplication(secondaryDraft)
-      notify(secondaryDraft ? '投递信息已更新，并创建了第 2 志愿' : '投递信息已更新')
+      additionalDrafts.forEach(addApplication)
+      notify(additionalDrafts.length ? `投递信息已更新，并创建了 ${additionalDrafts.length} 条追加志愿` : '投递信息已更新')
     } else {
       addApplication(draft)
-      if (secondaryDraft) addApplication(secondaryDraft)
-      notify(secondaryDraft ? '投递记录及第 2 志愿已创建' : '投递记录已创建')
+      additionalDrafts.forEach(addApplication)
+      notify(additionalDrafts.length ? `已创建 ${additionalDrafts.length + 1} 条志愿投递` : '投递记录已创建')
     }
     setFormOpen(false)
     setEditing(undefined)
