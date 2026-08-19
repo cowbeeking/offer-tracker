@@ -2,7 +2,7 @@ import type { Application, InterviewReview, WorkflowNode } from '@/types/applica
 import { createId } from '@/utils/id'
 
 export function createReviewTitle(application?: Application, node?: WorkflowNode): string {
-  return application ? `${application.companyName} · ${node?.name ?? '面试'}复盘` : '面试复盘'
+  return application ? `${application.companyName} · ${application.positionName} · ${node?.name ?? '面试'}复盘` : '面试复盘'
 }
 
 export function createReviewTemplate(application?: Application, node?: WorkflowNode): string {
