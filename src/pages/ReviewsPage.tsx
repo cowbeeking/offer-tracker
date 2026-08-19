@@ -1,20 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Download, Eye, FileText, Link2, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Code2, Download, Eye, FileDown, FileText, Link2, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { Application, InterviewReview } from '@/types/application'
 import { createInterviewReview } from '@/utils/review'
+import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
 
 interface ReviewsPageProps {
   applications: Application[]
   reviews: InterviewReview[]
+  openRequest?: { id: string; token: number }
   onAdd: (review: InterviewReview) => void
   onUpdate: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>>) => void
   onDelete: (id: string) => void
   onNotify: (message: string, tone?: 'success' | 'error') => void
 }
+
+type ReviewMode = 'source' | 'live' | 'preview'
 
 function formatUpdatedAt(timestamp: number): string {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -25,31 +30,17 @@ function formatUpdatedAt(timestamp: number): string {
   }).format(timestamp)
 }
 
-function safeFileName(title: string): string {
-  const normalized = title.trim().replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ')
-  return `${normalized || '未命名面试复盘'}.md`
-}
-
-async function downloadMarkdown(content: string, name: string): Promise<void> {
-  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = name
-  anchor.click()
-  URL.revokeObjectURL(url)
-}
-
-export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, onNotify }: ReviewsPageProps): JSX.Element {
+export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdate, onDelete, onNotify }: ReviewsPageProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string>()
   const [query, setQuery] = useState('')
-  const [preview, setPreview] = useState(false)
+  const [mode, setMode] = useState<ReviewMode>('live')
   const [deleting, setDeleting] = useState<InterviewReview>()
   const applicationById = useMemo(() => new Map(applications.map((item) => [item.id, item])), [applications])
   const sortedApplications = useMemo(() => [...applications].sort((a, b) =>
     `${a.companyName}${a.positionName}`.localeCompare(`${b.companyName}${b.positionName}`, 'zh-CN')),
   [applications])
   const sortedReviews = useMemo(() => [...reviews].sort((a, b) => b.updatedAt - a.updatedAt), [reviews])
+  const linkedReviewByApplication = useMemo(() => new Map(reviews.flatMap((review) => review.applicationId ? [[review.applicationId, review.id] as const] : [])), [reviews])
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
     if (!needle) return sortedReviews
@@ -67,23 +58,28 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
     setSelectedId(sortedReviews[0]?.id)
   }, [reviews, selectedId, sortedReviews])
 
+  useEffect(() => {
+    if (!openRequest) return
+    setSelectedId(openRequest.id)
+    setMode('live')
+  }, [openRequest])
+
   const addReview = (): void => {
     const review = createInterviewReview()
     onAdd(review)
     setSelectedId(review.id)
-    setPreview(false)
+    setMode('live')
   }
 
-  const exportReview = async (): Promise<void> => {
+  const exportReview = async (format: 'md' | 'pdf'): Promise<void> => {
     if (!selected) return
     try {
-      const name = safeFileName(selected.title)
-      const saved = window.desktopApi
-        ? await window.desktopApi.saveFile(selected.content, name, 'md')
-        : (await downloadMarkdown(selected.content, name), true)
-      if (saved) onNotify('Markdown 复盘已导出')
+      const saved = format === 'md'
+        ? await exportMarkdown(selected.title, selected.content, '未命名面试复盘')
+        : await exportMarkdownPdf(selected.title, selected.content, '未命名面试复盘')
+      if (saved) onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 复盘已导出`)
     } catch {
-      onNotify('Markdown 导出失败', 'error')
+      onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 导出失败`, 'error')
     }
   }
 
@@ -112,7 +108,7 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
               const application = review.applicationId ? applicationById.get(review.applicationId) : undefined
               return (
                 <div key={review.id} className={`review-note-card ${selectedId === review.id ? 'active' : ''}`}>
-                  <button className="review-note-select" onClick={() => { setSelectedId(review.id); setPreview(false) }}>
+                  <button className="review-note-select" onClick={() => { setSelectedId(review.id); setMode('live') }}>
                     <span className="review-note-icon"><FileText size={15} /></span>
                     <span className="review-note-copy">
                       <strong>{review.title.trim() || '未命名面试复盘'}</strong>
@@ -134,26 +130,39 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
               <input className="review-title-input" value={selected.title} maxLength={100} onChange={(event) => onUpdate(selected.id, { title: event.target.value })} placeholder="未命名面试复盘" />
               <div className="review-editor-tools">
                 <div className="review-mode-switch" role="group" aria-label="编辑模式">
-                  <button className={!preview ? 'active' : ''} onClick={() => setPreview(false)}><Pencil size={13} />编辑</button>
-                  <button className={preview ? 'active' : ''} onClick={() => setPreview(true)}><Eye size={13} />预览</button>
+                  <button className={mode === 'source' ? 'active' : ''} onClick={() => setMode('source')}><Code2 size={13} />源码</button>
+                  <button className={mode === 'live' ? 'active' : ''} onClick={() => setMode('live')}><Sparkles size={13} />实时预览</button>
+                  <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}><Eye size={13} />预览</button>
                 </div>
-                <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => void exportReview()}>导出 .md</Button>
+                <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => void exportReview('md')}>导出 .md</Button>
+                <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => void exportReview('pdf')}>导出 PDF</Button>
               </div>
             </div>
             <div className="review-meta-bar">
               <Link2 size={14} />
               <span>关联投递</span>
-              <select value={selected.applicationId ?? ''} onChange={(event) => onUpdate(selected.id, { applicationId: event.target.value || undefined })}>
+              <select value={selected.applicationId ?? ''} onChange={(event) => {
+                const applicationId = event.target.value || undefined
+                if (applicationId && linkedReviewByApplication.get(applicationId) && linkedReviewByApplication.get(applicationId) !== selected.id) {
+                  onNotify('这条投递已经有关联复盘', 'error')
+                  return
+                }
+                onUpdate(selected.id, { applicationId })
+              }}>
                 <option value="">不关联投递</option>
-                {sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}
+                {sortedApplications.map((application) => {
+                  const linkedReviewId = linkedReviewByApplication.get(application.id)
+                  const occupied = Boolean(linkedReviewId && linkedReviewId !== selected.id)
+                  return <option value={application.id} key={application.id} disabled={occupied}>{application.companyName} · {application.positionName}{occupied ? '（已有复盘）' : ''}</option>
+                })}
               </select>
               <i />
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
             </div>
-            <div className={`review-document ${preview ? 'is-preview' : 'is-editing'}`}>
-              {preview
-                ? <article className="markdown-preview"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>{selected.content}</ReactMarkdown></article>
-                : <textarea value={selected.content} onChange={(event) => onUpdate(selected.id, { content: event.target.value })} spellCheck={false} aria-label="Markdown 源码编辑器" />}
+            <div className={`review-document mode-${mode}`}>
+              {mode === 'preview' && <article className="markdown-preview markdown-prose"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer">{children}</a> }}>{selected.content}</ReactMarkdown></article>}
+              {mode === 'source' && <textarea value={selected.content} onChange={(event) => onUpdate(selected.id, { content: event.target.value })} spellCheck={false} aria-label="Markdown 源码编辑器" />}
+              {mode === 'live' && <LiveMarkdownEditor documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>记录一次面试</h2><p>点击右上角新建复盘，使用 Markdown 记录面试过程。</p></div>}
         </div>

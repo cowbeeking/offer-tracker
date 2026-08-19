@@ -7,7 +7,7 @@ interface ApplicationModalProps {
   application?: Application
   statuses: string[]
   companies: string[]
-  onSave: (draft: ApplicationDraft) => void
+  onSave: (draft: ApplicationDraft, secondaryDraft?: ApplicationDraft) => void
   onClose: () => void
 }
 

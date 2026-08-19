@@ -1,5 +1,5 @@
 import { DEFAULT_STATUSES } from '@/types/application'
-import type { AppStateData, Application, BackupData, InterviewReview, StatusHistory } from '@/types/application'
+import type { AppStateData, Application, BackupData, InterviewReview, KnowledgeNote, StatusHistory } from '@/types/application'
 import { createId } from '@/utils/id'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -52,6 +52,18 @@ function parseReview(value: unknown, applicationIds: Set<string>): InterviewRevi
     id: optionalString(value.id) ?? createId(),
     applicationId: applicationId && applicationIds.has(applicationId) ? applicationId : undefined,
     title: optionalString(value.title) ?? '未命名面试复盘',
+    content: value.content,
+    createdAt: timestamp(value.createdAt),
+    updatedAt: timestamp(value.updatedAt),
+  }
+}
+
+function parseKnowledgeNote(value: unknown): KnowledgeNote {
+  if (!isRecord(value)) throw new Error('知识笔记格式错误')
+  if (typeof value.content !== 'string') throw new Error('知识笔记正文格式错误')
+  return {
+    id: optionalString(value.id) ?? createId(),
+    title: optionalString(value.title) ?? '未命名知识笔记',
     content: value.content,
     createdAt: timestamp(value.createdAt),
     updatedAt: timestamp(value.updatedAt),
@@ -158,19 +170,27 @@ export function parseBackup(raw: string): AppStateData {
   })
   const applicationIds = new Set(applications.map(({ id }) => id))
   const reviewIds = new Set<string>()
+  const linkedApplicationIds = new Set<string>()
   const reviews = (Array.isArray(data.reviews) ? data.reviews : []).map((value) => parseReview(value, applicationIds)).map((review) => {
-    if (!reviewIds.has(review.id)) {
-      reviewIds.add(review.id)
-      return review
-    }
-    const id = createId()
+    const id = reviewIds.has(review.id) ? createId() : review.id
     reviewIds.add(id)
-    return { ...review, id }
+    const applicationId = review.applicationId && !linkedApplicationIds.has(review.applicationId)
+      ? review.applicationId
+      : undefined
+    if (applicationId) linkedApplicationIds.add(applicationId)
+    return { ...review, id, applicationId }
+  })
+  const knowledgeNoteIds = new Set<string>()
+  const knowledgeNotes = (Array.isArray(data.knowledgeNotes) ? data.knowledgeNotes : []).map(parseKnowledgeNote).map((note) => {
+    const id = knowledgeNoteIds.has(note.id) ? createId() : note.id
+    knowledgeNoteIds.add(id)
+    return { ...note, id }
   })
   return {
     version: 1,
     applications,
     reviews,
+    knowledgeNotes,
     customStatuses: [...customStatuses, ...new Set(discoveredStatuses)],
     theme: data.theme === 'light' || data.theme === 'dark' || data.theme === 'system' ? data.theme : 'system',
     initialized: true,

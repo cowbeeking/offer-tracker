@@ -2,13 +2,14 @@
 
 [![CI](https://github.com/cowbeeking/offer-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/cowbeeking/offer-tracker/actions/workflows/ci.yml)
 
-一个打开即用、无需登录、完全离线的秋招 / 校招投递管理桌面客户端。数据保存在本机 IndexedDB 中，支持完整流程历史、看板拖拽、统计和备份恢复。
+一个打开即用、无需登录的秋招 / 校招投递管理桌面客户端。数据保存在本机 IndexedDB 中，支持完整流程历史、看板拖拽、统计和备份恢复。
 
 ## 功能
 
 - 投递记录新增、编辑、删除与历史公司自动补全
-- 支持记录“第几志愿”，并在列表、看板和详情中展示与筛选
-- Obsidian 风格面试复盘：Markdown 源码编辑、渲染预览、投递关联、看板快捷创建、搜索与 `.md` 导出
+- 支持记录“第几志愿”，新建或编辑投递时可同时创建第 2 志愿，并在列表、看板和详情中展示与筛选
+- Obsidian 风格面试复盘：源码编辑、块级实时预览、完整预览、投递关联、看板快捷创建、搜索及 `.md` / PDF 导出
+- 独立知识笔记：Markdown 编辑、实时预览、搜索及 `.md` / PDF 导出
 - Dashboard、截止日期提醒和今日待办
 - 实时搜索，以及状态、公司、地点和日期筛选
 - 招聘流程详情、事件日期 / 时间和完整状态历史

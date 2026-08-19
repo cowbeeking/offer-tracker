@@ -8,6 +8,7 @@ import type {
   ApplicationDraft,
   ApplicationStatus,
   InterviewReview,
+  KnowledgeNote,
   PersistenceStatus,
   StatusHistory,
   ThemeMode,
@@ -20,6 +21,7 @@ const EMPTY_STATE: AppStateData = {
   version: 1,
   applications: [],
   reviews: [],
+  knowledgeNotes: [],
   customStatuses: [],
   theme: 'system',
   initialized: false,
@@ -33,6 +35,9 @@ type Action =
   | { type: 'ADD_REVIEW'; review: InterviewReview }
   | { type: 'UPDATE_REVIEW'; id: string; changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>> }
   | { type: 'DELETE_REVIEW'; id: string }
+  | { type: 'ADD_KNOWLEDGE_NOTE'; note: KnowledgeNote }
+  | { type: 'UPDATE_KNOWLEDGE_NOTE'; id: string; changes: Partial<Pick<KnowledgeNote, 'title' | 'content'>> }
+  | { type: 'DELETE_KNOWLEDGE_NOTE'; id: string }
   | {
       type: 'UPDATE_STATUS'
       id: string
@@ -95,6 +100,16 @@ function applicationFromDraft(draft: ApplicationDraft): Application {
   }
 }
 
+function uniqueReviewLinks(reviews: InterviewReview[]): InterviewReview[] {
+  const linkedApplications = new Set<string>()
+  return reviews.map((review) => {
+    if (!review.applicationId) return review
+    if (linkedApplications.has(review.applicationId)) return { ...review, applicationId: undefined }
+    linkedApplications.add(review.applicationId)
+    return review
+  })
+}
+
 function reducer(state: AppStateData, action: Action): AppStateData {
   switch (action.type) {
     case 'LOAD':
@@ -102,7 +117,8 @@ function reducer(state: AppStateData, action: Action): AppStateData {
         ...EMPTY_STATE,
         ...action.state,
         applications: action.state.applications ?? [],
-        reviews: action.state.reviews ?? [],
+        reviews: uniqueReviewLinks(action.state.reviews ?? []),
+        knowledgeNotes: action.state.knowledgeNotes ?? [],
         customStatuses: action.state.customStatuses ?? [],
         initialized: true,
       }
@@ -155,8 +171,10 @@ function reducer(state: AppStateData, action: Action): AppStateData {
           : review),
       }
     case 'ADD_REVIEW':
+      if (action.review.applicationId && state.reviews.some((review) => review.applicationId === action.review.applicationId)) return state
       return { ...state, reviews: [action.review, ...state.reviews] }
     case 'UPDATE_REVIEW':
+      if (action.changes.applicationId && state.reviews.some((review) => review.id !== action.id && review.applicationId === action.changes.applicationId)) return state
       return {
         ...state,
         reviews: state.reviews.map((review) => review.id === action.id
@@ -165,6 +183,17 @@ function reducer(state: AppStateData, action: Action): AppStateData {
       }
     case 'DELETE_REVIEW':
       return { ...state, reviews: state.reviews.filter(({ id }) => id !== action.id) }
+    case 'ADD_KNOWLEDGE_NOTE':
+      return { ...state, knowledgeNotes: [action.note, ...state.knowledgeNotes] }
+    case 'UPDATE_KNOWLEDGE_NOTE':
+      return {
+        ...state,
+        knowledgeNotes: state.knowledgeNotes.map((note) => note.id === action.id
+          ? { ...note, ...action.changes, updatedAt: Date.now() }
+          : note),
+      }
+    case 'DELETE_KNOWLEDGE_NOTE':
+      return { ...state, knowledgeNotes: state.knowledgeNotes.filter(({ id }) => id !== action.id) }
     case 'UPDATE_STATUS':
       return {
         ...state,
@@ -191,12 +220,13 @@ function reducer(state: AppStateData, action: Action): AppStateData {
         ...EMPTY_STATE,
         ...action.data,
         applications: action.data.applications ?? [],
-        reviews: action.data.reviews ?? [],
+        reviews: uniqueReviewLinks(action.data.reviews ?? []),
+        knowledgeNotes: action.data.knowledgeNotes ?? [],
         customStatuses: action.data.customStatuses ?? [],
         initialized: true,
       }
     case 'CLEAR_DATA':
-      return { ...state, applications: [], reviews: [] }
+      return { ...state, applications: [], reviews: [], knowledgeNotes: [] }
     case 'REMOVE_DEMO':
       return { ...state, applications: state.applications.filter(({ isDemo }) => !isDemo) }
     case 'SET_THEME':
@@ -227,6 +257,9 @@ interface AppStoreValue {
   addReview: (review: InterviewReview) => void
   updateReview: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>>) => void
   deleteReview: (id: string) => void
+  addKnowledgeNote: (note: KnowledgeNote) => void
+  updateKnowledgeNote: (id: string, changes: Partial<Pick<KnowledgeNote, 'title' | 'content'>>) => void
+  deleteKnowledgeNote: (id: string) => void
   updateStatus: (
     id: string,
     status: ApplicationStatus,
@@ -333,6 +366,9 @@ export function AppStoreProvider({ children }: { children: React.ReactNode }): J
       addReview: (review) => dispatch({ type: 'ADD_REVIEW', review }),
       updateReview: (id, changes) => dispatch({ type: 'UPDATE_REVIEW', id, changes }),
       deleteReview: (id) => dispatch({ type: 'DELETE_REVIEW', id }),
+      addKnowledgeNote: (note) => dispatch({ type: 'ADD_KNOWLEDGE_NOTE', note }),
+      updateKnowledgeNote: (id, changes) => dispatch({ type: 'UPDATE_KNOWLEDGE_NOTE', id, changes }),
+      deleteKnowledgeNote: (id) => dispatch({ type: 'DELETE_KNOWLEDGE_NOTE', id }),
       updateStatus: (id, status, event) => dispatch({ type: 'UPDATE_STATUS', id, status, event }),
       replaceData: (data) => dispatch({ type: 'REPLACE_DATA', data }),
       clearData: () => dispatch({ type: 'CLEAR_DATA' }),

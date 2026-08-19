@@ -70,14 +70,23 @@ export interface InterviewReview {
   updatedAt: number
 }
 
+export interface KnowledgeNote {
+  id: string
+  title: string
+  content: string
+  createdAt: number
+  updatedAt: number
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system'
 export type PersistenceStatus = 'saving' | 'saved' | 'error'
-export type PageKey = 'dashboard' | 'applications' | 'board' | 'reviews' | 'statistics' | 'settings'
+export type PageKey = 'dashboard' | 'applications' | 'board' | 'reviews' | 'knowledge' | 'statistics' | 'settings'
 
 export interface AppStateData {
   version: 1
   applications: Application[]
   reviews: InterviewReview[]
+  knowledgeNotes: KnowledgeNote[]
   customStatuses: string[]
   theme: ThemeMode
   initialized: boolean

@@ -732,6 +732,10 @@
     @apply ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-[9px] font-medium text-muted transition hover:bg-accent/10 hover:text-accent;
   }
 
+  .card-review-action.completed {
+    @apply bg-accent/10 text-accent;
+  }
+
   .drag-handle {
     @apply text-muted/60;
   }
@@ -1098,6 +1102,30 @@
 
   .field-span-2 {
     @apply col-span-2;
+  }
+
+  .secondary-preference {
+    @apply rounded-lg border border-dashed border-line bg-canvas/45 p-3;
+  }
+
+  .secondary-preference-head {
+    @apply flex items-center justify-between gap-4;
+  }
+
+  .secondary-preference-head > div {
+    @apply flex min-w-0 flex-col;
+  }
+
+  .secondary-preference-head strong {
+    @apply text-[11px] font-medium text-ink;
+  }
+
+  .secondary-preference-head span {
+    @apply mt-0.5 text-[9px] leading-4 text-muted;
+  }
+
+  .secondary-preference-field {
+    @apply mt-3 border-t border-line pt-3;
   }
 
   .field-group {
@@ -1569,7 +1597,7 @@
     @apply min-h-0 flex-1 overflow-hidden;
   }
 
-  .review-document textarea {
+  .review-document.mode-source > textarea {
     @apply h-full w-full resize-none border-0 bg-panel px-8 py-6 font-mono text-[12px] leading-6 text-ink outline-none ring-0;
     tab-size: 2;
   }
@@ -1578,85 +1606,116 @@
     @apply mx-auto h-full w-full max-w-[860px] overflow-y-auto px-12 py-8 text-[13px] leading-7 text-ink/90;
   }
 
-  .markdown-preview > :first-child {
+  .markdown-prose > :first-child {
     @apply mt-0;
   }
 
-  .markdown-preview h1 {
+  .markdown-prose h1 {
     @apply mb-5 mt-8 border-b border-line pb-3 text-[24px] font-semibold tracking-[-0.035em] text-ink;
   }
 
-  .markdown-preview h2 {
+  .markdown-prose h2 {
     @apply mb-3 mt-8 text-[18px] font-semibold tracking-[-0.025em] text-ink;
   }
 
-  .markdown-preview h3 {
+  .markdown-prose h3 {
     @apply mb-2 mt-6 text-[14px] font-semibold text-ink;
   }
 
-  .markdown-preview p {
+  .markdown-prose p {
     @apply my-3;
   }
 
-  .markdown-preview ul {
+  .markdown-prose ul {
     @apply my-3 list-disc pl-6;
   }
 
-  .markdown-preview ol {
+  .markdown-prose ol {
     @apply my-3 list-decimal pl-6;
   }
 
-  .markdown-preview li {
+  .markdown-prose li {
     @apply my-1 pl-0.5;
   }
 
-  .markdown-preview ul.contains-task-list {
+  .markdown-prose ul.contains-task-list {
     @apply list-none pl-1;
   }
 
-  .markdown-preview .task-list-item {
+  .markdown-prose .task-list-item {
     @apply flex items-start gap-2;
   }
 
-  .markdown-preview input[type='checkbox'] {
+  .markdown-prose input[type='checkbox'] {
     @apply mt-1.5 size-3.5 accent-accent;
   }
 
-  .markdown-preview blockquote {
+  .markdown-prose blockquote {
     @apply my-4 border-l-2 border-accent/40 bg-accent/[0.045] px-4 py-1 text-muted;
   }
 
-  .markdown-preview code {
+  .markdown-prose code {
     @apply rounded bg-ink/[0.06] px-1.5 py-0.5 font-mono text-[11px] text-ink;
   }
 
-  .markdown-preview pre {
+  .markdown-prose pre {
     @apply my-4 overflow-x-auto rounded-lg border border-line bg-canvas p-4;
   }
 
-  .markdown-preview pre code {
+  .markdown-prose pre code {
     @apply bg-transparent p-0 leading-5;
   }
 
-  .markdown-preview a {
+  .markdown-prose a {
     @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent;
   }
 
-  .markdown-preview hr {
+  .markdown-prose hr {
     @apply my-7 border-0 border-t border-line;
   }
 
-  .markdown-preview table {
+  .markdown-prose table {
     @apply my-4 w-full border-collapse overflow-hidden rounded-lg text-[11px];
   }
 
-  .markdown-preview th,
-  .markdown-preview td {
+  .markdown-prose th,
+  .markdown-prose td {
     @apply border border-line px-3 py-2 text-left;
   }
 
-  .markdown-preview th {
+  .markdown-prose th {
     @apply bg-canvas font-semibold text-ink;
+  }
+
+  .markdown-live-editor {
+    @apply mx-auto h-full w-full max-w-[860px] overflow-y-auto px-10 py-7 text-[13px] leading-7 text-ink/90;
+  }
+
+  .markdown-live-block {
+    @apply relative min-h-7 rounded-md;
+  }
+
+  .markdown-live-block + .markdown-live-block {
+    @apply mt-1;
+  }
+
+  .markdown-live-rendered {
+    @apply min-h-7 cursor-text rounded-md px-2 py-1 transition hover:bg-ink/[0.025];
+  }
+
+  .markdown-live-rendered:empty::before {
+    @apply text-muted/50;
+    content: '点击输入内容';
+  }
+
+  .markdown-live-textarea {
+    @apply block w-full resize-none overflow-hidden rounded-md border border-accent/25 bg-accent/[0.035] px-3 py-2 font-mono text-[12px] leading-6 text-ink outline-none ring-2 ring-accent/10;
+    min-height: 48px;
+    tab-size: 2;
+  }
+
+  .markdown-live-block.active {
+    @apply py-1;
   }
 
   .review-editor-empty {
@@ -1699,6 +1758,7 @@
   .data-actions { grid-template-columns: 1fr; }
   .review-workspace { grid-template-columns: 220px minmax(0, 1fr); }
   .markdown-preview { padding-left: 32px; padding-right: 32px; }
+  .markdown-live-editor { padding-left: 24px; padding-right: 24px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

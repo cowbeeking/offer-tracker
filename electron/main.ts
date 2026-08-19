@@ -52,6 +52,31 @@ app.whenReady().then(() => {
     },
   )
 
+  ipcMain.handle('file:save-pdf', async (_event, payload: { html: string; defaultPath: string }) => {
+    const result = await dialog.showSaveDialog({
+      defaultPath: payload.defaultPath,
+      filters: [{ name: 'PDF 文档', extensions: ['pdf'] }],
+    })
+    if (result.canceled || !result.filePath) return false
+
+    const printWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    })
+    try {
+      await printWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(payload.html)}`)
+      const pdf = await printWindow.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
+      await writeFile(result.filePath, pdf)
+      return true
+    } finally {
+      printWindow.destroy()
+    }
+  })
+
   ipcMain.handle('file:open-json', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],

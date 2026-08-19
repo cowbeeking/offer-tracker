@@ -11,10 +11,9 @@ interface DashboardPageProps {
   statuses: string[]
   onNavigate: (page: PageKey) => void
   onOpen: (application: Application) => void
-  onAdd: () => void
 }
 
-export function DashboardPage({ applications, statuses, onNavigate, onOpen, onAdd }: DashboardPageProps): JSX.Element {
+export function DashboardPage({ applications, statuses, onNavigate, onOpen }: DashboardPageProps): JSX.Element {
   const metrics = useApplicationMetrics(applications)
   const progress = statuses
     .filter((status) => !['待投递', '已拒绝', '已结束'].includes(status))
@@ -53,7 +52,7 @@ export function DashboardPage({ applications, statuses, onNavigate, onOpen, onAd
                 </div>
               ))}
             </div>
-          ) : <EmptyState title="还没有流程数据" description="新增一条投递后，进展会显示在这里。" action={<Button variant="primary" size="sm" onClick={onAdd}>新增投递</Button>} />}
+          ) : <EmptyState title="还没有流程数据" description="前往投递记录添加机会后，进展会显示在这里。" action={<Button size="sm" onClick={() => onNavigate('applications')}>前往投递记录</Button>} />}
         </section>
 
         <section className="panel deadline-panel">

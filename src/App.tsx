@@ -12,6 +12,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { StatisticsPage } from '@/pages/StatisticsPage'
 import { ReviewsPage } from '@/pages/ReviewsPage'
+import { KnowledgeNotesPage } from '@/pages/KnowledgeNotesPage'
 import type { Application, ApplicationDraft, PageKey } from '@/types/application'
 import { createInterviewReview } from '@/utils/review'
 
@@ -20,6 +21,7 @@ const PAGE_LABELS: Record<PageKey, string> = {
   applications: '投递记录',
   board: '流程看板',
   reviews: '面试复盘',
+  knowledge: '知识笔记',
   statistics: '数据统计',
   settings: '设置',
 }
@@ -38,6 +40,9 @@ export function App(): JSX.Element {
     addReview,
     updateReview,
     deleteReview,
+    addKnowledgeNote,
+    updateKnowledgeNote,
+    deleteKnowledgeNote,
     updateStatus,
     replaceData,
     clearData,
@@ -54,6 +59,7 @@ export function App(): JSX.Element {
   const [editing, setEditing] = useState<Application | undefined>()
   const [detailId, setDetailId] = useState<string>()
   const [deleting, setDeleting] = useState<Application>()
+  const [reviewOpenRequest, setReviewOpenRequest] = useState<{ id: string; token: number }>()
   const [searchRequest, setSearchRequest] = useState(0)
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' }>()
   const detailApplication = state.applications.find((application) => application.id === detailId)
@@ -130,13 +136,15 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [deleting, detailId, formOpen, navigateTo, openCreate, page])
 
-  const saveApplication = (draft: ApplicationDraft): void => {
+  const saveApplication = (draft: ApplicationDraft, secondaryDraft?: ApplicationDraft): void => {
     if (editing) {
       updateApplication(editing.id, draft)
-      notify('投递信息已更新')
+      if (secondaryDraft) addApplication(secondaryDraft)
+      notify(secondaryDraft ? '投递信息已更新，并创建了第 2 志愿' : '投递信息已更新')
     } else {
       addApplication(draft)
-      notify('投递记录已创建')
+      if (secondaryDraft) addApplication(secondaryDraft)
+      notify(secondaryDraft ? '投递记录及第 2 志愿已创建' : '投递记录已创建')
     }
     setFormOpen(false)
     setEditing(undefined)
@@ -157,10 +165,13 @@ export function App(): JSX.Element {
     notify(`已将 ${current.companyName} 更新为「${status}」`)
   }
 
-  const createLinkedReview = (application: Application): void => {
-    addReview(createInterviewReview(application))
+  const openApplicationReview = (application: Application): void => {
+    const existing = state.reviews.find((review) => review.applicationId === application.id)
+    const review = existing ?? createInterviewReview(application)
+    if (!existing) addReview(review)
+    setReviewOpenRequest({ id: review.id, token: Date.now() })
     navigateTo('reviews')
-    notify(`已为 ${application.companyName} 创建关联复盘`)
+    notify(existing ? `已打开 ${application.companyName} 的复盘` : `已为 ${application.companyName} 创建关联复盘`)
   }
 
   if (loading) {
@@ -179,14 +190,15 @@ export function App(): JSX.Element {
           <div className="breadcrumb"><span>Autumn Tracker</span><i>/</i><strong>{PAGE_LABELS[page]}</strong></div>
           <div className="topbar-actions">
             <button className="topbar-search" onClick={() => { navigateTo('applications'); setSearchRequest((value) => value + 1) }}><Search size={15} /><span>快速搜索</span><kbd>Ctrl K</kbd></button>
-            <Button className="topbar-create" variant="primary" size="sm" icon={<Plus size={14} />} onClick={openCreate}>新增投递</Button>
+            {page === 'applications' && <Button className="topbar-create" variant="primary" size="sm" icon={<Plus size={14} />} onClick={openCreate}>新增投递</Button>}
           </div>
         </div>}
         <div className={`page-container ${page === 'settings' ? 'settings-container' : ''}`}>
-          {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} onAdd={openCreate} />}
+          {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} />}
           {page === 'applications' && <ApplicationsPage applications={state.applications} statuses={statuses} searchRequest={searchRequest} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onEdit={openEdit} onDelete={setDeleting} />}
-          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onCreateReview={createLinkedReview} onStatusChange={changeStatus} />}
-          {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
+          {page === 'board' && <BoardPage applications={state.applications} reviews={state.reviews} statuses={statuses} onOpen={(item) => setDetailId(item.id)} onReview={openApplicationReview} onStatusChange={changeStatus} />}
+          {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} openRequest={reviewOpenRequest} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
+          {page === 'knowledge' && <KnowledgeNotesPage notes={state.knowledgeNotes} onAdd={addKnowledgeNote} onUpdate={updateKnowledgeNote} onDelete={deleteKnowledgeNote} onNotify={notify} />}
           {page === 'statistics' && <StatisticsPage applications={state.applications} />}
           {page === 'settings' && <SettingsPage data={state} onBack={() => navigateTo(lastWorkspacePage)} onReplaceData={replaceData} onClearData={clearData} onRemoveDemo={removeDemoData} onThemeChange={setTheme} onAddStatus={addCustomStatus} onRemoveStatus={removeCustomStatus} onNotify={notify} />}
         </div>

@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Application, ApplicationDraft } from '@/types/application'
 import { toDateInput } from '@/utils/date'
@@ -27,7 +28,7 @@ interface ApplicationFormProps {
   application?: Application
   statuses: string[]
   companies: string[]
-  onSubmit: (draft: ApplicationDraft) => void
+  onSubmit: (draft: ApplicationDraft, secondaryDraft?: ApplicationDraft) => void
   onCancel: () => void
 }
 
@@ -35,6 +36,8 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
   const [draft, setDraft] = useState<ApplicationDraft>(() => draftFromApplication(application))
   const [error, setError] = useState('')
   const [eventDateTouched, setEventDateTouched] = useState(false)
+  const [secondaryEnabled, setSecondaryEnabled] = useState(false)
+  const [secondaryPositionName, setSecondaryPositionName] = useState('')
   const companyOptions = useMemo(() => [...new Set(companies)].sort((a, b) => a.localeCompare(b, 'zh-CN')), [companies])
 
   const setField = <K extends keyof ApplicationDraft>(field: K, value: ApplicationDraft[K]): void => {
@@ -56,6 +59,18 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
       setError('志愿顺序需要填写 1 到 99 之间的整数。')
       return
     }
+    if (secondaryEnabled && !secondaryPositionName.trim()) {
+      setError('请填写第 2 志愿的岗位名称。')
+      return
+    }
+    if (secondaryEnabled && draft.preferenceOrder === '2') {
+      setError('当前投递已经是第 2 志愿，不能再同时创建另一个第 2 志愿。')
+      return
+    }
+    if (secondaryEnabled && draft.positionName.trim() === secondaryPositionName.trim()) {
+      setError('第 2 志愿岗位不能与当前岗位完全相同。')
+      return
+    }
     if (draft.deadline && draft.deadline < draft.applicationDate) {
       setError('截止日期不能早于投递日期。')
       return
@@ -65,7 +80,11 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
       setError('流程事件日期不能早于投递日期。')
       return
     }
-    onSubmit(draft)
+    const primaryDraft = secondaryEnabled && !draft.preferenceOrder ? { ...draft, preferenceOrder: '1' } : draft
+    const secondaryDraft = secondaryEnabled
+      ? { ...draft, positionName: secondaryPositionName.trim(), preferenceOrder: '2' }
+      : undefined
+    onSubmit(primaryDraft, secondaryDraft)
   }
 
   return (
@@ -92,6 +111,18 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
             placeholder="例如：后端开发工程师"
           />
         </label>
+        <div className="secondary-preference field-span-2">
+          <div className="secondary-preference-head">
+            <div><strong>第 2 志愿</strong><span>沿用同一公司的日期、状态和其他信息，保存时创建为独立投递。</span></div>
+            {secondaryEnabled
+              ? <Button type="button" size="sm" variant="ghost" icon={<X size={13} />} onClick={() => { setSecondaryEnabled(false); setSecondaryPositionName('') }}>取消二志愿</Button>
+              : <Button type="button" size="sm" icon={<Plus size={13} />} onClick={() => { setSecondaryEnabled(true); if (!draft.preferenceOrder) setField('preferenceOrder', '1') }}>创建二志愿</Button>}
+          </div>
+          {secondaryEnabled && <label className="field secondary-preference-field">
+            <span>二志愿岗位名称 <em>*</em></span>
+            <input value={secondaryPositionName} onChange={(event) => { if (error) setError(''); setSecondaryPositionName(event.target.value) }} placeholder="例如：测试开发工程师" />
+          </label>}
+        </div>
         <label className="field">
           <span>投递日期 <em>*</em></span>
           <input type="date" value={draft.applicationDate} onChange={(event) => {

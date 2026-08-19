@@ -1,21 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { BookOpenText, CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
+import { BookCheck, BookOpenText, CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
-import type { Application } from '@/types/application'
+import type { Application, InterviewReview } from '@/types/application'
 import { formatShortDate } from '@/utils/date'
 
 interface BoardPageProps {
   applications: Application[]
+  reviews: InterviewReview[]
   statuses: string[]
-  onAdd: () => void
   onOpen: (application: Application) => void
-  onCreateReview: (application: Application) => void
+  onReview: (application: Application, review?: InterviewReview) => void
   onStatusChange: (id: string, status: string) => void
 }
 
-export function BoardPage({ applications, statuses, onAdd, onOpen, onCreateReview, onStatusChange }: BoardPageProps): JSX.Element {
+export function BoardPage({ applications, reviews, statuses, onOpen, onReview, onStatusChange }: BoardPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [overStatus, setOverStatus] = useState<string | null>(null)
@@ -151,7 +150,10 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onCreateRevie
                 >
                   <header><StatusTag status={status} /><span>{items.length}</span></header>
                   <div className="kanban-list">
-                    {items.map((application) => (
+                    {items.map((application) => {
+                      const review = reviews.find((item) => item.applicationId === application.id)
+                      const ReviewIcon = review ? BookCheck : BookOpenText
+                      return (
                       <article
                         key={application.id}
                         className={`kanban-card ${draggedId === application.id ? 'dragging' : ''}`}
@@ -169,17 +171,17 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onCreateRevie
                           <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>
                           {application.location && <span><MapPin size={13} />{application.location}</span>}
                           <button
-                            className="card-review-action"
+                            className={`card-review-action ${review ? 'completed' : ''}`}
                             draggable={false}
-                            aria-label={`为 ${application.companyName} 创建面试复盘`}
-                            title="创建关联复盘"
+                            aria-label={`${application.companyName}${review ? '已复盘，打开复盘' : '未复盘，创建复盘'}`}
+                            title={review ? '打开关联复盘' : '创建关联复盘'}
                             onMouseDown={(event) => event.stopPropagation()}
-                            onClick={(event) => { event.stopPropagation(); onCreateReview(application) }}
-                          ><BookOpenText size={13} />复盘</button>
+                            onClick={(event) => { event.stopPropagation(); onReview(application, review) }}
+                          ><ReviewIcon size={13} />{review ? '已复盘' : '未复盘'}</button>
                           <GripVertical size={15} className="drag-handle" />
                         </div>
                       </article>
-                    ))}
+                    )})}
                     {!items.length && <div className="column-empty">拖到这里更新为「{status}」</div>}
                   </div>
                 </section>
@@ -187,7 +189,7 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onCreateRevie
             })}
           </div>
         </div>
-      ) : <section className="panel"><EmptyState title="看板还是空的" description="新增投递后，可在不同招聘阶段之间直接拖动。" action={<Button variant="primary" size="sm" onClick={onAdd}>新增投递</Button>} /></section>}
+      ) : <section className="panel"><EmptyState title="看板还是空的" description="请先在投递记录中添加机会，再到这里推进招聘阶段。" /></section>}
     </div>
   )
 }
