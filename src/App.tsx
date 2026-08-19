@@ -13,6 +13,7 @@ import { SettingsPage } from '@/pages/SettingsPage'
 import { StatisticsPage } from '@/pages/StatisticsPage'
 import { ReviewsPage } from '@/pages/ReviewsPage'
 import type { Application, ApplicationDraft, PageKey } from '@/types/application'
+import { createInterviewReview } from '@/utils/review'
 
 const PAGE_LABELS: Record<PageKey, string> = {
   dashboard: '概览',
@@ -156,6 +157,12 @@ export function App(): JSX.Element {
     notify(`已将 ${current.companyName} 更新为「${status}」`)
   }
 
+  const createLinkedReview = (application: Application): void => {
+    addReview(createInterviewReview(application))
+    navigateTo('reviews')
+    notify(`已为 ${application.companyName} 创建关联复盘`)
+  }
+
   if (loading) {
     return <div className="app-loading"><span className="brand-mark">秋</span><div><strong>秋招 Tracker</strong><small>正在读取本地数据…</small></div></div>
   }
@@ -178,7 +185,7 @@ export function App(): JSX.Element {
         <div className={`page-container ${page === 'settings' ? 'settings-container' : ''}`}>
           {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} onAdd={openCreate} />}
           {page === 'applications' && <ApplicationsPage applications={state.applications} statuses={statuses} searchRequest={searchRequest} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onEdit={openEdit} onDelete={setDeleting} />}
-          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onStatusChange={changeStatus} />}
+          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onCreateReview={createLinkedReview} onStatusChange={changeStatus} />}
           {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
           {page === 'statistics' && <StatisticsPage applications={state.applications} />}
           {page === 'settings' && <SettingsPage data={state} onBack={() => navigateTo(lastWorkspacePage)} onReplaceData={replaceData} onClearData={clearData} onRemoveDemo={removeDemoData} onThemeChange={setTheme} onAddStatus={addCustomStatus} onRemoveStatus={removeCustomStatus} onNotify={notify} />}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
-import { CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
+import { BookOpenText, CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
@@ -11,10 +11,11 @@ interface BoardPageProps {
   statuses: string[]
   onAdd: () => void
   onOpen: (application: Application) => void
+  onCreateReview: (application: Application) => void
   onStatusChange: (id: string, status: string) => void
 }
 
-export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChange }: BoardPageProps): JSX.Element {
+export function BoardPage({ applications, statuses, onAdd, onOpen, onCreateReview, onStatusChange }: BoardPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [overStatus, setOverStatus] = useState<string | null>(null)
@@ -167,6 +168,14 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
                         <div className="card-meta">
                           <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>
                           {application.location && <span><MapPin size={13} />{application.location}</span>}
+                          <button
+                            className="card-review-action"
+                            draggable={false}
+                            aria-label={`为 ${application.companyName} 创建面试复盘`}
+                            title="创建关联复盘"
+                            onMouseDown={(event) => event.stopPropagation()}
+                            onClick={(event) => { event.stopPropagation(); onCreateReview(application) }}
+                          ><BookOpenText size={13} />复盘</button>
                           <GripVertical size={15} className="drag-handle" />
                         </div>
                       </article>

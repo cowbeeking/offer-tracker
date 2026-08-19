@@ -728,8 +728,12 @@
     @apply flex items-center gap-1;
   }
 
+  .card-review-action {
+    @apply ml-auto inline-flex h-5 items-center gap-1 rounded px-1.5 text-[9px] font-medium text-muted transition hover:bg-accent/10 hover:text-accent;
+  }
+
   .drag-handle {
-    @apply ml-auto text-muted/60;
+    @apply text-muted/60;
   }
 
   .column-empty {
@@ -1440,20 +1444,38 @@
     @apply min-h-0 flex-1 overflow-y-auto p-2;
   }
 
-  .review-note-list > button {
-    @apply mb-1 flex w-full gap-2.5 rounded-lg border border-transparent p-2.5 text-left transition hover:bg-ink/[0.035];
+  .review-note-card {
+    @apply relative mb-1 rounded-lg border border-transparent transition hover:bg-ink/[0.035];
   }
 
-  .review-note-list > button.active {
+  .review-note-card.active {
     @apply border-accent/15 bg-accent/[0.08];
+  }
+
+  .review-note-select {
+    @apply flex w-full gap-2.5 p-2.5 pr-8 text-left;
   }
 
   .review-note-icon {
     @apply mt-0.5 grid size-7 flex-none place-items-center rounded-md border border-line bg-panel text-muted;
   }
 
-  .review-note-list > button.active .review-note-icon {
+  .review-note-card.active .review-note-icon {
     @apply border-accent/20 bg-accent/10 text-accent;
+  }
+
+  .review-note-delete {
+    @apply absolute right-1.5 top-1.5 grid size-6 place-items-center rounded text-muted/60 opacity-60 transition hover:bg-red-50 hover:text-red-600 hover:opacity-100;
+  }
+
+  .review-note-card:hover .review-note-delete,
+  .review-note-card.active .review-note-delete,
+  .review-note-delete:focus-visible {
+    @apply opacity-100;
+  }
+
+  .dark .review-note-delete:hover {
+    @apply bg-red-950/40 text-red-300;
   }
 
   .review-note-copy {
@@ -1521,14 +1543,6 @@
 
   .review-mode-switch button.active {
     @apply bg-panel text-ink shadow-sm;
-  }
-
-  .review-delete-button {
-    @apply grid size-7 place-items-center rounded-md text-muted transition hover:bg-red-50 hover:text-red-600;
-  }
-
-  .dark .review-delete-button:hover {
-    @apply bg-red-950/40 text-red-300;
   }
 
   .review-meta-bar {

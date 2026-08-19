@@ -5,7 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { Application, InterviewReview } from '@/types/application'
-import { createId } from '@/utils/id'
+import { createInterviewReview } from '@/utils/review'
 
 interface ReviewsPageProps {
   applications: Application[]
@@ -14,46 +14,6 @@ interface ReviewsPageProps {
   onUpdate: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>>) => void
   onDelete: (id: string) => void
   onNotify: (message: string, tone?: 'success' | 'error') => void
-}
-
-function createTemplate(): string {
-  return `# 面试复盘
-
-## 面试信息
-
-- **日期：**
-- **轮次：**
-- **面试官：**
-- **时长：**
-
-## 问题记录
-
-### 1. 问题标题
-
-- **问题：**
-- **我的回答：**
-- **更好的回答：**
-
-## 表现复盘
-
-### 做得好的
-
--
-
-### 可以改进的
-
--
-
-## 知识点补充
-
-在这里整理面试中暴露的知识盲区。
-
-## 后续行动
-
-- [ ] 补充知识点
-- [ ] 整理高频问题
-- [ ] 准备下一轮面试
-`
 }
 
 function formatUpdatedAt(timestamp: number): string {
@@ -108,14 +68,7 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
   }, [reviews, selectedId, sortedReviews])
 
   const addReview = (): void => {
-    const now = Date.now()
-    const review: InterviewReview = {
-      id: createId(),
-      title: '未命名面试复盘',
-      content: createTemplate(),
-      createdAt: now,
-      updatedAt: now,
-    }
+    const review = createInterviewReview()
     onAdd(review)
     setSelectedId(review.id)
     setPreview(false)
@@ -158,14 +111,17 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
             {filteredReviews.map((review) => {
               const application = review.applicationId ? applicationById.get(review.applicationId) : undefined
               return (
-                <button key={review.id} className={selectedId === review.id ? 'active' : ''} onClick={() => { setSelectedId(review.id); setPreview(false) }}>
-                  <span className="review-note-icon"><FileText size={15} /></span>
-                  <span className="review-note-copy">
-                    <strong>{review.title.trim() || '未命名面试复盘'}</strong>
-                    <small>{application ? `${application.companyName} · ${application.positionName}` : '未关联投递'}</small>
-                    <time>{formatUpdatedAt(review.updatedAt)}</time>
-                  </span>
-                </button>
+                <div key={review.id} className={`review-note-card ${selectedId === review.id ? 'active' : ''}`}>
+                  <button className="review-note-select" onClick={() => { setSelectedId(review.id); setPreview(false) }}>
+                    <span className="review-note-icon"><FileText size={15} /></span>
+                    <span className="review-note-copy">
+                      <strong>{review.title.trim() || '未命名面试复盘'}</strong>
+                      <small>{application ? `${application.companyName} · ${application.positionName}` : '未关联投递'}</small>
+                      <time>{formatUpdatedAt(review.updatedAt)}</time>
+                    </span>
+                  </button>
+                  <button className="review-note-delete" aria-label={`删除 ${review.title.trim() || '未命名面试复盘'}`} title="删除复盘" onClick={() => setDeleting(review)}><Trash2 size={13} /></button>
+                </div>
               )
             })}
             {!filteredReviews.length && <div className="review-list-empty"><FileText size={20} /><strong>{reviews.length ? '没有匹配的复盘' : '还没有面试复盘'}</strong><span>{reviews.length ? '换个关键词试试。' : '新建一篇 Markdown 笔记开始记录。'}</span></div>}
@@ -182,7 +138,6 @@ export function ReviewsPage({ applications, reviews, onAdd, onUpdate, onDelete, 
                   <button className={preview ? 'active' : ''} onClick={() => setPreview(true)}><Eye size={13} />预览</button>
                 </div>
                 <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => void exportReview()}>导出 .md</Button>
-                <button className="review-delete-button" aria-label="删除复盘" title="删除复盘" onClick={() => setDeleting(selected)}><Trash2 size={15} /></button>
               </div>
             </div>
             <div className="review-meta-bar">
