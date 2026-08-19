@@ -67,7 +67,11 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 }
 
 const components: Components = {
-  a: ({ children, href }) => <a href={href} target="_blank" rel="noreferrer">{children}</a>,
+  a: ({ children, href }) => {
+    const color = /^#color-([0-9a-f]{6})$/i.exec(href ?? '')?.[1]
+    if (color) return <span className="markdown-colored-text" style={{ color: `#${color}` }}>{children}</span>
+    return <a href={href} target="_blank" rel="noreferrer">{children}</a>
+  },
   code: ({ children, className }) => {
     const languageTag = /(?:^|\s)language-([^\s]+)/i.exec(className ?? '')?.[1]
     if (!languageTag) return <code className={className}>{children}</code>

@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookMarked, Code2, Download, Eye, FileDown, FileText, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
+import { MarkdownToolbar } from '@/components/MarkdownToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { KnowledgeNote } from '@/types/application'
 import { createKnowledgeNote } from '@/utils/knowledge'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
+import type { MarkdownEditorHandle } from '@/utils/markdownEditing'
 
 interface KnowledgeNotesPageProps {
   notes: KnowledgeNote[]
@@ -33,6 +36,7 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
   const [mode, setMode] = useState<EditorMode>('live')
   const [deleting, setDeleting] = useState<KnowledgeNote>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
   const sortedNotes = useMemo(() => [...notes].sort((a, b) => b.updatedAt - a.updatedAt), [notes])
   const filteredNotes = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
@@ -126,10 +130,11 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
               <i />
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
             </div>
+            <MarkdownToolbar disabled={mode === 'preview'} onAction={(action) => markdownEditorRef.current?.applyAction(action)} />
             <div className={`review-document mode-${mode}`}>
               {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selected.content} /></article>}
-              {mode === 'source' && <textarea value={selected.content} onChange={(event) => onUpdate(selected.id, { content: event.target.value })} spellCheck={false} aria-label="Markdown 源码编辑器" />}
-              {mode === 'live' && <LiveMarkdownEditor documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>建立自己的知识库</h2><p>点击右上角新建笔记，使用 Markdown 开始整理。</p></div>}
         </div>

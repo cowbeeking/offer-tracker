@@ -1,12 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Code2, Download, Eye, FileDown, FileText, Link2, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
+import { MarkdownToolbar } from '@/components/MarkdownToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import type { Application, InterviewReview, WorkflowNode } from '@/types/application'
-import { createInterviewReview } from '@/utils/review'
+import { createInterviewReview, createReviewTitle } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
+import type { MarkdownEditorHandle } from '@/utils/markdownEditing'
 
 interface ReviewsPageProps {
   applications: Application[]
@@ -36,6 +39,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const [mode, setMode] = useState<ReviewMode>('live')
   const [deleting, setDeleting] = useState<InterviewReview>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const markdownEditorRef = useRef<MarkdownEditorHandle>(null)
   const applicationById = useMemo(() => new Map(applications.map((item) => [item.id, item])), [applications])
   const sortedApplications = useMemo(() => [...applications].sort((a, b) =>
     `${a.companyName}${a.positionName}`.localeCompare(`${b.companyName}${b.positionName}`, 'zh-CN')),
@@ -149,12 +153,14 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               <span>关联投递</span>
               <select value={selected.applicationId ?? ''} onChange={(event) => {
                 const applicationId = event.target.value || undefined
+                const application = applications.find((item) => item.id === applicationId)
+                const node = workflowNodes.find((item) => item.id === selected.workflowNodeId)
                 const key = applicationId && selected.workflowNodeId ? `${applicationId}:${selected.workflowNodeId}` : undefined
                 if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
                   onNotify('这条投递的该流程节点已经有复盘', 'error')
                   return
                 }
-                onUpdate(selected.id, { applicationId })
+                onUpdate(selected.id, { applicationId, ...(application ? { title: createReviewTitle(application, node) } : {}) })
               }}>
                 <option value="">不关联投递</option>
                 {sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}
@@ -163,12 +169,13 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               <select value={selected.workflowNodeId ?? ''} onChange={(event) => {
                 const workflowNodeId = event.target.value || undefined
                 const node = workflowNodes.find((item) => item.id === workflowNodeId)
+                const application = applications.find((item) => item.id === selected.applicationId)
                 const key = selected.applicationId && workflowNodeId ? `${selected.applicationId}:${workflowNodeId}` : undefined
                 if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
                   onNotify('这条投递的该流程节点已经有复盘', 'error')
                   return
                 }
-                onUpdate(selected.id, { workflowNodeId, stageName: node?.name })
+                onUpdate(selected.id, { workflowNodeId, stageName: node?.name, ...(application ? { title: createReviewTitle(application, node) } : {}) })
               }}>
                 <option value="">未指定节点</option>
                 {reviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}
@@ -176,10 +183,11 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               <i />
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
             </div>
+            <MarkdownToolbar disabled={mode === 'preview'} onAction={(action) => markdownEditorRef.current?.applyAction(action)} />
             <div className={`review-document mode-${mode}`}>
               {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selected.content} /></article>}
-              {mode === 'source' && <textarea value={selected.content} onChange={(event) => onUpdate(selected.id, { content: event.target.value })} spellCheck={false} aria-label="Markdown 源码编辑器" />}
-              {mode === 'live' && <LiveMarkdownEditor documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>记录一次面试</h2><p>点击右上角新建复盘，使用 Markdown 记录面试过程。</p></div>}
         </div>

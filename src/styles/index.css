@@ -892,7 +892,8 @@
   }
 
   .settings-nav {
-    @apply mb-7 flex items-center justify-between;
+    @apply sticky top-0 z-30 -mx-2 mb-7 flex items-center justify-between border-b border-transparent bg-canvas/90 px-2 py-2.5 backdrop-blur-xl;
+    box-shadow: 0 10px 22px -22px rgb(var(--ink) / 0.45);
   }
 
   .settings-back {
@@ -1092,15 +1093,19 @@
   }
 
   .workflow-node-row {
-    @apply flex min-h-10 items-center gap-2 rounded-lg border border-line bg-canvas/45 px-2.5 transition hover:border-ink/20;
+    @apply relative flex min-h-10 items-center gap-2 rounded-lg border border-line bg-canvas/45 px-2.5 transition-[border-color,background-color,box-shadow,opacity,transform] duration-200 hover:border-ink/20;
   }
 
   .workflow-node-row.dragging {
-    @apply border-accent/40 bg-accent/5 opacity-50;
+    @apply z-10 scale-[1.015] border-accent/50 bg-accent/10 opacity-55 shadow-lg;
+  }
+
+  .workflow-node-row.drag-target {
+    @apply border-accent/60 bg-accent/10 shadow-[0_0_0_3px_rgba(var(--accent),0.08)];
   }
 
   .workflow-drag {
-    @apply cursor-grab text-muted/60 active:cursor-grabbing;
+    @apply cursor-grab rounded p-1 text-muted/60 transition duration-200 hover:bg-ink/5 hover:text-ink active:cursor-grabbing;
   }
 
   .workflow-index {
@@ -1871,6 +1876,114 @@
     @apply truncate text-[9px] text-muted;
   }
 
+  .markdown-toolbar {
+    @apply relative z-[4] flex min-h-11 flex-none flex-wrap items-center gap-1.5 border-b border-line bg-gradient-to-r from-canvas/80 via-panel to-canvas/60 px-4 py-1.5 shadow-[0_1px_0_rgb(var(--line)/0.35)];
+  }
+
+  .markdown-toolbar > i {
+    @apply mx-0.5 h-5 w-px flex-none bg-line not-italic;
+  }
+
+  .markdown-tool-group {
+    @apply flex flex-none items-center gap-0.5 rounded-lg border border-transparent;
+  }
+
+  .markdown-tool-group > button,
+  .markdown-table-tool > button,
+  .markdown-color-tool > button {
+    @apply grid size-7 flex-none place-items-center rounded-md text-muted transition hover:bg-ink/[0.055] hover:text-ink disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .markdown-tool-group > button:active,
+  .markdown-table-tool > button.active,
+  .markdown-color-tool > button.active {
+    @apply bg-accent/10 text-accent;
+  }
+
+  .format-heading select,
+  .markdown-code-select select {
+    @apply h-7 appearance-none border-0 bg-transparent text-[9px] font-medium text-ink outline-none;
+  }
+
+  .format-heading select {
+    @apply min-w-[62px] rounded-md px-2 hover:bg-ink/[0.045];
+  }
+
+  .markdown-code-select {
+    @apply flex h-7 items-center gap-1 rounded-md px-1.5 text-muted transition hover:bg-ink/[0.045] hover:text-ink;
+  }
+
+  .markdown-code-select select {
+    @apply w-[60px] cursor-pointer;
+  }
+
+  .markdown-color-tool {
+    @apply relative;
+  }
+
+  .markdown-color-popover {
+    @apply absolute left-0 top-9 z-20 w-[184px] rounded-xl border border-line bg-panel p-3 shadow-2xl;
+    animation: toast-in 140ms ease-out;
+  }
+
+  .markdown-color-popover > strong {
+    @apply block text-[11px] font-semibold text-ink;
+  }
+
+  .markdown-color-popover > div {
+    @apply mt-2 grid grid-cols-8 gap-1;
+  }
+
+  .markdown-color-popover > div button {
+    @apply size-4 rounded-full border border-white/70 shadow-sm ring-1 ring-ink/10 transition hover:scale-110;
+  }
+
+  .markdown-color-popover > label {
+    @apply mt-3 flex items-center justify-between border-t border-line pt-2 text-[9px] text-muted;
+  }
+
+  .markdown-color-popover input {
+    @apply h-6 w-9 cursor-pointer rounded border border-line bg-transparent p-0.5;
+  }
+
+  .markdown-table-tool {
+    @apply relative;
+  }
+
+  .markdown-table-popover {
+    @apply absolute right-0 top-9 z-20 grid w-[190px] grid-cols-2 gap-2 rounded-xl border border-line bg-panel p-3 text-[9px] text-muted shadow-2xl;
+    animation: toast-in 140ms ease-out;
+  }
+
+  .markdown-table-popover > strong {
+    @apply col-span-2 text-[11px] font-semibold text-ink;
+  }
+
+  .markdown-table-popover label {
+    @apply flex flex-col gap-1;
+  }
+
+  .markdown-table-popover input {
+    @apply h-8 w-full rounded-md border border-line bg-input px-2 text-[10px] text-ink outline-none focus:border-accent/40 focus:ring-2 focus:ring-accent/10;
+  }
+
+  .markdown-table-confirm {
+    @apply col-span-2 mt-1 h-8 rounded-md bg-accent px-3 text-[9px] font-semibold text-white shadow-sm transition hover:brightness-105;
+  }
+
+  .dark .markdown-table-confirm {
+    @apply text-[#18201c];
+  }
+
+  .markdown-toolbar.disabled .markdown-tool-group,
+  .markdown-toolbar.disabled > i {
+    @apply opacity-45;
+  }
+
+  .markdown-toolbar-hint {
+    @apply ml-auto whitespace-nowrap text-[8px] text-muted;
+  }
+
   .review-document {
     @apply min-h-0 flex-1 overflow-hidden;
   }
@@ -1898,6 +2011,22 @@
 
   .markdown-prose h3 {
     @apply mb-2 mt-6 text-[14px] font-semibold text-ink;
+  }
+
+  .markdown-prose h4 {
+    @apply mb-2 mt-5 text-[13px] font-semibold text-ink;
+  }
+
+  .markdown-prose h5 {
+    @apply mb-1.5 mt-4 text-[12px] font-semibold text-ink;
+  }
+
+  .markdown-prose h6 {
+    @apply mb-1 mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted;
+  }
+
+  .markdown-colored-text {
+    @apply font-medium;
   }
 
   .markdown-prose p {

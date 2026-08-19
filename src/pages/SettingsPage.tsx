@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { BookOpenText, ChevronLeft, Database, Download, FileJson, FileSpreadsheet, GripVertical, Monitor, Moon, Plus, Power, RotateCcw, Settings2, Sun, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -35,15 +35,32 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
   const [newStatus, setNewStatus] = useState('')
   const [newStatusHasReview, setNewStatusHasReview] = useState(false)
   const [draggedNodeId, setDraggedNodeId] = useState<string>()
+  const [dragTargetNodeId, setDragTargetNodeId] = useState<string>()
   const [workflowOrderChanged, setWorkflowOrderChanged] = useState(false)
   const [autoLaunch, setAutoLaunch] = useState(false)
   const [autoLaunchLoading, setAutoLaunchLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
+  const workflowRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const previousWorkflowPositions = useRef(new Map<string, number>())
   const demoCount = data.applications.filter((item) => item.isDemo).length
 
   useEffect(() => {
     void window.desktopApi?.getAutoLaunch().then(setAutoLaunch).finally(() => setAutoLaunchLoading(false))
   }, [])
+
+  useLayoutEffect(() => {
+    workflowRowRefs.current.forEach((element, id) => {
+      const previousTop = previousWorkflowPositions.current.get(id)
+      if (previousTop === undefined) return
+      const delta = previousTop - element.getBoundingClientRect().top
+      if (Math.abs(delta) < 1) return
+      element.animate([
+        { transform: `translateY(${delta}px)` },
+        { transform: 'translateY(0)' },
+      ], { duration: 220, easing: 'cubic-bezier(.2,.8,.2,1)' })
+    })
+    previousWorkflowPositions.current.clear()
+  }, [data.workflowNodes])
 
   const toggleAutoLaunch = async (): Promise<void> => {
     if (!window.desktopApi || autoLaunchLoading) return
@@ -130,10 +147,12 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
   const moveNode = (event: DragEvent, targetId: string): void => {
     event.preventDefault()
     if (!draggedNodeId || draggedNodeId === targetId) return
+    setDragTargetNodeId(targetId)
     const nodes = [...data.workflowNodes]
     const fromIndex = nodes.findIndex((node) => node.id === draggedNodeId)
     const targetIndex = nodes.findIndex((node) => node.id === targetId)
     if (fromIndex < 0 || targetIndex < 0) return
+    workflowRowRefs.current.forEach((element, id) => previousWorkflowPositions.current.set(id, element.getBoundingClientRect().top))
     const [moved] = nodes.splice(fromIndex, 1)
     nodes.splice(targetIndex, 0, moved)
     onSetWorkflowNodes(nodes)
@@ -165,7 +184,7 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
           </div>
           <div className="system-setting-row">
             <span className="settings-icon"><Power size={17} /></span>
-            <div><strong>开机自动启动</strong><small>登录 Windows 后自动打开秋招 Tracker，以免错过节点提醒。</small></div>
+            <div><strong>开机后台启动</strong><small>登录 Windows 后静默驻留系统托盘；提醒始终在桌面右下角弹窗并播放音乐，点击“查看节点”才打开主界面。</small></div>
             <Button size="sm" onClick={onPreviewReminder}>试听提醒</Button>
             <button className={`switch-control ${autoLaunch ? 'active' : ''}`} role="switch" aria-checked={autoLaunch} disabled={autoLaunchLoading || !window.desktopApi} onClick={() => void toggleAutoLaunch()}><span /></button>
           </div>
@@ -195,18 +214,19 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
               {data.workflowNodes.map((node, index) => {
                 const inUse = data.applications.some((item) => item.status === node.name || item.histories.some((history) => history.status === node.name) || item.nodeProgress.some((progress) => progress.workflowNodeId === node.id)) || data.reviews.some((review) => review.workflowNodeId === node.id)
                 return <div
-                  className={`workflow-node-row ${draggedNodeId === node.id ? 'dragging' : ''}`}
+                  ref={(element) => { if (element) workflowRowRefs.current.set(node.id, element); else workflowRowRefs.current.delete(node.id) }}
+                  className={`workflow-node-row ${draggedNodeId === node.id ? 'dragging' : ''} ${dragTargetNodeId === node.id && draggedNodeId !== node.id ? 'drag-target' : ''}`}
                   key={node.id}
                   onDragEnter={(event) => moveNode(event, node.id)}
                   onDragOver={(event) => event.preventDefault()}
-                  onDrop={(event) => event.preventDefault()}
+                  onDrop={(event) => { event.preventDefault(); setDragTargetNodeId(undefined) }}
                 >
                   <span
                     className="workflow-drag"
                     title="拖动调整顺序"
                     draggable
-                    onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; setDraggedNodeId(node.id); setWorkflowOrderChanged(false) }}
-                    onDragEnd={() => { setDraggedNodeId(undefined); if (workflowOrderChanged) onNotify('招聘流程顺序已更新') }}
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', node.id); setDraggedNodeId(node.id); setWorkflowOrderChanged(false) }}
+                    onDragEnd={() => { setDraggedNodeId(undefined); setDragTargetNodeId(undefined); if (workflowOrderChanged) onNotify('招聘流程顺序已更新') }}
                   ><GripVertical size={15} /></span>
                   <span className="workflow-index">{index + 1}</span>
                   <strong>{node.name}</strong>

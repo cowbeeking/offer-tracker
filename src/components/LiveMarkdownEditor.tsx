@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
+import { applyMarkdownAction, type MarkdownAction, type MarkdownEditorHandle } from '@/utils/markdownEditing'
 
 interface MarkdownBlock {
   start: number
@@ -124,11 +125,11 @@ function editableEnd(text: string): number {
   return text.replace(/\n+$/, '').length
 }
 
-export function LiveMarkdownEditor({ documentId, value, onChange }: LiveMarkdownEditorProps): JSX.Element {
+export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownEditorProps>(function LiveMarkdownEditor({ documentId, value, onChange }, ref): JSX.Element {
   const [source, setSource] = useState(value)
   const [activeRange, setActiveRange] = useState<{ start: number; end: number }>()
   const editorRef = useRef<HTMLTextAreaElement>(null)
-  const pendingSelectionRef = useRef<number>()
+  const pendingSelectionRef = useRef<{ start: number; end: number }>()
   const previousDocumentRef = useRef(documentId)
   const blocks = useMemo(() => {
     if (!activeRange) return parseMarkdownBlocks(source)
@@ -172,31 +173,68 @@ export function LiveMarkdownEditor({ documentId, value, onChange }: LiveMarkdown
     editor.style.height = `${Math.max(48, editor.scrollHeight)}px`
     editor.focus()
     const selection = pendingSelectionRef.current
-    if (selection !== undefined) {
-      editor.setSelectionRange(selection, selection)
+    if (selection) {
+      editor.setSelectionRange(selection.start, selection.end)
       pendingSelectionRef.current = undefined
     }
   }, [activeRange, source])
 
   const activate = (block: MarkdownBlock): void => {
-    pendingSelectionRef.current = editableEnd(block.text)
+    const end = editableEnd(block.text)
+    pendingSelectionRef.current = { start: end, end }
     setActiveRange({ start: block.start, end: block.end })
   }
 
   const updateBlock = (block: MarkdownBlock, event: ChangeEvent<HTMLTextAreaElement>): void => {
     const replacement = event.target.value
     const nextSource = `${source.slice(0, block.start)}${replacement}${source.slice(block.end)}`
-    pendingSelectionRef.current = event.target.selectionStart
+    pendingSelectionRef.current = { start: event.target.selectionStart, end: event.target.selectionEnd }
     setSource(nextSource)
     setActiveRange({ start: block.start, end: block.start + replacement.length })
     onChange(nextSource)
   }
 
+  const applyAction = (action: MarkdownAction): void => {
+    const editor = editorRef.current
+    const selectionStart = activeRange && editor ? activeRange.start + editor.selectionStart : source.length
+    const selectionEnd = activeRange && editor ? activeRange.start + editor.selectionEnd : selectionStart
+    const result = applyMarkdownAction(source, selectionStart, selectionEnd, action)
+    const nextBlocks = parseMarkdownBlocks(result.value)
+    const activeBlock = nextBlocks.find((block) => result.selectionStart >= block.start && result.selectionStart <= block.end) ?? nextBlocks[nextBlocks.length - 1]
+    setSource(result.value)
+    setActiveRange({ start: activeBlock.start, end: activeBlock.end })
+    pendingSelectionRef.current = {
+      start: Math.max(0, result.selectionStart - activeBlock.start),
+      end: Math.max(0, result.selectionEnd - activeBlock.start),
+    }
+    onChange(result.value)
+  }
+
+  useImperativeHandle(ref, () => ({
+    applyAction,
+    focus: () => editorRef.current?.focus(),
+  }))
+
   const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'b') {
+      event.preventDefault()
+      applyAction({ type: 'bold' })
+      return
+    }
+    if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'i') {
+      event.preventDefault()
+      applyAction({ type: 'italic' })
+      return
+    }
     if (event.key === 'Escape') {
       event.currentTarget.blur()
       setActiveRange(undefined)
     }
+  }
+
+  const handleBlur = (event: FocusEvent<HTMLTextAreaElement>): void => {
+    if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.markdown-toolbar')) return
+    setActiveRange(undefined)
   }
 
   return (
@@ -212,7 +250,7 @@ export function LiveMarkdownEditor({ documentId, value, onChange }: LiveMarkdown
                   rows={1}
                   value={block.text}
                   onChange={(event) => updateBlock(block, event)}
-                  onBlur={() => setActiveRange(undefined)}
+                  onBlur={handleBlur}
                   onKeyDown={handleEditorKeyDown}
                   spellCheck={false}
                   aria-label="Markdown 实时预览编辑器"
@@ -229,4 +267,4 @@ export function LiveMarkdownEditor({ documentId, value, onChange }: LiveMarkdown
       })}
     </div>
   )
-}
+})

@@ -117,9 +117,18 @@ export function App(): JSX.Element {
     if (presentedReminderKeys.current.has(key)) return
     presentedReminderKeys.current.add(key)
     updateNodeProgress(application.id, node, { reminderSentAt: Date.now() })
-    setReminderAlert({ application, node, scheduledAt: progress.scheduledAt })
-    void window.desktopApi?.showReminder()
-    try { playReminderSound() } catch { /* 系统禁用音频时仍显示提醒。 */ }
+    if (window.desktopApi) {
+      void window.desktopApi.showReminder({
+        applicationId: application.id,
+        companyName: application.companyName,
+        positionName: application.positionName,
+        nodeName: node.name,
+        scheduledAt: progress.scheduledAt,
+      })
+    } else {
+      setReminderAlert({ application, node, scheduledAt: progress.scheduledAt })
+      try { playReminderSound() } catch { /* 浏览器禁用音频时仍显示提醒。 */ }
+    }
   }, [updateNodeProgress])
 
   const handleNodeProgress = useCallback((applicationId: string, node: WorkflowNode, changes: Partial<Omit<ApplicationNodeProgress, 'workflowNodeId' | 'updatedAt'>>): void => {
@@ -172,7 +181,6 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     const checkReminders = (): void => {
-      if (reminderAlert) return
       const now = Date.now()
       const due = state.applications.flatMap((application) => application.nodeProgress.flatMap((progress) => {
         if (progress.state !== 'active' || !progress.scheduledAt || progress.reminderMinutesBefore === undefined || progress.reminderSentAt) return []
@@ -189,7 +197,12 @@ export function App(): JSX.Element {
     checkReminders()
     const timer = window.setInterval(checkReminders, 30_000)
     return () => window.clearInterval(timer)
-  }, [presentReminder, reminderAlert, state.applications, state.workflowNodes])
+  }, [presentReminder, state.applications, state.workflowNodes])
+
+  useEffect(() => window.desktopApi?.onOpenReminder((applicationId) => {
+    navigateTo('applications')
+    setDetailId(applicationId)
+  }), [navigateTo])
 
   const openCreate = useCallback(() => {
     setEditing(undefined)
@@ -291,9 +304,19 @@ export function App(): JSX.Element {
       notify('请先添加一条投递记录再试听提醒', 'error')
       return
     }
-    setReminderAlert({ application, node, scheduledAt: localDateTimeValue() })
-    void window.desktopApi?.showReminder()
-    try { playReminderSound() } catch { /* 系统禁用音频时仍显示提醒。 */ }
+    const scheduledAt = localDateTimeValue()
+    if (window.desktopApi) {
+      void window.desktopApi.showReminder({
+        applicationId: application.id,
+        companyName: application.companyName,
+        positionName: `${application.positionName} · 弹窗试听`,
+        nodeName: node.name,
+        scheduledAt,
+      })
+    } else {
+      setReminderAlert({ application, node, scheduledAt })
+      try { playReminderSound() } catch { /* 浏览器禁用音频时仍显示提醒。 */ }
+    }
   }
 
   if (loading) {

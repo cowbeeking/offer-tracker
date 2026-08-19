@@ -1,15 +1,15 @@
 import type { Application, InterviewReview, WorkflowNode } from '@/types/application'
 import { createId } from '@/utils/id'
 
-function reviewHeading(application?: Application, node?: WorkflowNode): string {
-  return application ? `${application.companyName} · ${application.positionName} · ${node?.name ?? '面试'}复盘` : '面试复盘'
+export function createReviewTitle(application?: Application, node?: WorkflowNode): string {
+  return application ? `${application.companyName} · ${node?.name ?? '面试'}复盘` : '面试复盘'
 }
 
 export function createReviewTemplate(application?: Application, node?: WorkflowNode): string {
   const linkedDetails = application
     ? `- **公司：** ${application.companyName}\n- **岗位：** ${application.positionName}\n- **复盘节点：** ${node?.name ?? application.status}\n`
     : ''
-  return `# ${reviewHeading(application, node)}
+  return `# ${createReviewTitle(application, node)}
 
 ## 面试信息
 
@@ -55,7 +55,7 @@ export function createInterviewReview(application?: Application, node?: Workflow
     applicationId: application?.id,
     workflowNodeId: node?.id,
     stageName: node?.name,
-    title: application ? reviewHeading(application, node) : '未命名面试复盘',
+    title: application ? createReviewTitle(application, node) : '未命名面试复盘',
     content: createReviewTemplate(application, node),
     createdAt: now,
     updatedAt: now,
