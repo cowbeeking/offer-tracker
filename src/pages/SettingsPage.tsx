@@ -1,11 +1,11 @@
-import { useRef, useState, type ChangeEvent } from 'react'
-import { ChevronLeft, Database, Download, FileJson, FileSpreadsheet, Monitor, Moon, Plus, RotateCcw, Settings2, Sun, Trash2, Upload, X } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
+import { BookOpenText, ChevronLeft, Database, Download, FileJson, FileSpreadsheet, GripVertical, Monitor, Moon, Plus, Power, RotateCcw, Settings2, Sun, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { applicationsToCsv, createBackup, parseBackup } from '@/services/backup'
-import { DEFAULT_STATUSES } from '@/types/application'
-import type { AppStateData, ThemeMode } from '@/types/application'
+import type { AppStateData, ThemeMode, WorkflowNode } from '@/types/application'
 import { toDateInput } from '@/utils/date'
+import { createId } from '@/utils/id'
 
 interface SettingsPageProps {
   data: AppStateData
@@ -14,8 +14,8 @@ interface SettingsPageProps {
   onClearData: () => void
   onRemoveDemo: () => void
   onThemeChange: (theme: ThemeMode) => void
-  onAddStatus: (status: string) => void
-  onRemoveStatus: (status: string) => void
+  onSetWorkflowNodes: (nodes: WorkflowNode[]) => void
+  onPreviewReminder: () => void
   onNotify: (message: string, tone?: 'success' | 'error') => void
 }
 
@@ -29,12 +29,35 @@ async function downloadFallback(content: string, name: string, type: string): Pr
   URL.revokeObjectURL(url)
 }
 
-export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemoveDemo, onThemeChange, onAddStatus, onRemoveStatus, onNotify }: SettingsPageProps): JSX.Element {
+export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemoveDemo, onThemeChange, onSetWorkflowNodes, onPreviewReminder, onNotify }: SettingsPageProps): JSX.Element {
   const [clearOpen, setClearOpen] = useState(false)
   const [pendingImport, setPendingImport] = useState<AppStateData>()
   const [newStatus, setNewStatus] = useState('')
+  const [newStatusHasReview, setNewStatusHasReview] = useState(false)
+  const [draggedNodeId, setDraggedNodeId] = useState<string>()
+  const [workflowOrderChanged, setWorkflowOrderChanged] = useState(false)
+  const [autoLaunch, setAutoLaunch] = useState(false)
+  const [autoLaunchLoading, setAutoLaunchLoading] = useState(true)
   const fileInput = useRef<HTMLInputElement>(null)
   const demoCount = data.applications.filter((item) => item.isDemo).length
+
+  useEffect(() => {
+    void window.desktopApi?.getAutoLaunch().then(setAutoLaunch).finally(() => setAutoLaunchLoading(false))
+  }, [])
+
+  const toggleAutoLaunch = async (): Promise<void> => {
+    if (!window.desktopApi || autoLaunchLoading) return
+    setAutoLaunchLoading(true)
+    try {
+      const enabled = await window.desktopApi.setAutoLaunch(!autoLaunch)
+      setAutoLaunch(enabled)
+      onNotify(enabled ? '已开启开机自启' : '已关闭开机自启')
+    } catch {
+      onNotify('无法更新开机自启设置', 'error')
+    } finally {
+      setAutoLaunchLoading(false)
+    }
+  }
 
   const exportJson = async (): Promise<void> => {
     try {
@@ -94,13 +117,27 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
   const submitStatus = (): void => {
     const status = newStatus.trim()
     if (!status) return
-    if (DEFAULT_STATUSES.includes(status as (typeof DEFAULT_STATUSES)[number]) || data.customStatuses.includes(status)) {
+    if (data.workflowNodes.some((node) => node.name === status)) {
       onNotify('这个流程节点已经存在', 'error')
       return
     }
-    onAddStatus(status)
+    onSetWorkflowNodes([...data.workflowNodes, { id: createId(), name: status, hasReview: newStatusHasReview }])
     setNewStatus('')
+    setNewStatusHasReview(false)
     onNotify(`已添加流程节点「${status}」`)
+  }
+
+  const moveNode = (event: DragEvent, targetId: string): void => {
+    event.preventDefault()
+    if (!draggedNodeId || draggedNodeId === targetId) return
+    const nodes = [...data.workflowNodes]
+    const fromIndex = nodes.findIndex((node) => node.id === draggedNodeId)
+    const targetIndex = nodes.findIndex((node) => node.id === targetId)
+    if (fromIndex < 0 || targetIndex < 0) return
+    const [moved] = nodes.splice(fromIndex, 1)
+    nodes.splice(targetIndex, 0, moved)
+    onSetWorkflowNodes(nodes)
+    setWorkflowOrderChanged(true)
   }
 
   return (
@@ -126,6 +163,12 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
               return <button key={item.value} className={data.theme === item.value ? 'active' : ''} onClick={() => onThemeChange(item.value)}><Icon size={16} /><span>{item.label}</span>{data.theme === item.value && <i />}</button>
             })}
           </div>
+          <div className="system-setting-row">
+            <span className="settings-icon"><Power size={17} /></span>
+            <div><strong>开机自动启动</strong><small>登录 Windows 后自动打开秋招 Tracker，以免错过节点提醒。</small></div>
+            <Button size="sm" onClick={onPreviewReminder}>试听提醒</Button>
+            <button className={`switch-control ${autoLaunch ? 'active' : ''}`} role="switch" aria-checked={autoLaunch} disabled={autoLaunchLoading || !window.desktopApi} onClick={() => void toggleAutoLaunch()}><span /></button>
+          </div>
         </section>
 
         <section className="settings-section panel">
@@ -141,13 +184,38 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
         </section>
 
         <section className="settings-section panel">
-          <div className="settings-copy"><span className="settings-icon"><Plus size={18} /></span><div><h2>自定义流程节点</h2><p>默认节点保持稳定，也可以补充适合自己的招聘阶段。</p></div></div>
-          <div className="custom-status-editor">
-            <div className="status-input-row"><input maxLength={20} value={newStatus} onChange={(event) => setNewStatus(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitStatus() }} placeholder="例如：主管面 / 意向书" /><Button variant="primary" size="sm" onClick={submitStatus}>添加节点</Button></div>
-            {data.customStatuses.length ? <div className="custom-status-list">{data.customStatuses.map((status) => {
-              const inUse = data.applications.some((item) => item.status === status)
-              return <span key={status}>{status}<button disabled={inUse} title={inUse ? '仍有投递使用此节点' : '删除节点'} onClick={() => onRemoveStatus(status)}><X size={13} /></button></span>
-            })}</div> : <p className="settings-hint">还没有自定义节点。</p>}
+          <div className="settings-copy"><span className="settings-icon"><Plus size={18} /></span><div><h2>招聘流程编排</h2><p>拖动所有节点调整顺序，并为需要记录笔试或面试过程的节点开启复盘。</p></div></div>
+          <div className="custom-status-editor workflow-editor">
+            <div className="status-input-row workflow-create-row">
+              <input maxLength={20} value={newStatus} onChange={(event) => setNewStatus(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitStatus() }} placeholder="例如：主管面 / 群面 / 技术笔试" />
+              <label className="review-toggle"><input type="checkbox" checked={newStatusHasReview} onChange={(event) => setNewStatusHasReview(event.target.checked)} /><BookOpenText size={14} /><span>需要复盘</span></label>
+              <Button variant="primary" size="sm" onClick={submitStatus}>添加节点</Button>
+            </div>
+            <div className="workflow-node-list">
+              {data.workflowNodes.map((node, index) => {
+                const inUse = data.applications.some((item) => item.status === node.name || item.histories.some((history) => history.status === node.name) || item.nodeProgress.some((progress) => progress.workflowNodeId === node.id)) || data.reviews.some((review) => review.workflowNodeId === node.id)
+                return <div
+                  className={`workflow-node-row ${draggedNodeId === node.id ? 'dragging' : ''}`}
+                  key={node.id}
+                  onDragEnter={(event) => moveNode(event, node.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => event.preventDefault()}
+                >
+                  <span
+                    className="workflow-drag"
+                    title="拖动调整顺序"
+                    draggable
+                    onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; setDraggedNodeId(node.id); setWorkflowOrderChanged(false) }}
+                    onDragEnd={() => { setDraggedNodeId(undefined); if (workflowOrderChanged) onNotify('招聘流程顺序已更新') }}
+                  ><GripVertical size={15} /></span>
+                  <span className="workflow-index">{index + 1}</span>
+                  <strong>{node.name}</strong>
+                  {node.isTerminal && <small>结束状态</small>}
+                  <label className="review-toggle compact"><input type="checkbox" checked={node.hasReview} onChange={(event) => onSetWorkflowNodes(data.workflowNodes.map((item) => item.id === node.id ? { ...item, hasReview: event.target.checked } : item))} /><BookOpenText size={13} /><span>{node.hasReview ? '需要复盘' : '无需复盘'}</span></label>
+                  <button className="workflow-delete" disabled={inUse || data.workflowNodes.length <= 1} title={inUse ? '仍有投递使用此节点' : '删除节点'} onClick={() => { onSetWorkflowNodes(data.workflowNodes.filter((item) => item.id !== node.id)); onNotify(`已删除流程节点「${node.name}」`) }}><X size={13} /></button>
+                </div>
+              })}
+            </div>
           </div>
         </section>
       </div>

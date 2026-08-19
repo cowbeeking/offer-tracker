@@ -6,5 +6,8 @@ interface Window {
     savePdf: (html: string, defaultPath: string) => Promise<boolean>
     openJsonFile: () => Promise<string | null>
     openExternal: (url: string) => Promise<boolean>
+    getAutoLaunch: () => Promise<boolean>
+    setAutoLaunch: (enabled: boolean) => Promise<boolean>
+    showReminder: () => Promise<boolean>
   }
 }

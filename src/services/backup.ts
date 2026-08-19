@@ -1,5 +1,5 @@
-import { DEFAULT_STATUSES } from '@/types/application'
-import type { AppStateData, Application, BackupData, InterviewReview, KnowledgeNote, StatusHistory } from '@/types/application'
+import { DEFAULT_STATUSES, DEFAULT_WORKFLOW_NODES } from '@/types/application'
+import type { AppStateData, Application, ApplicationNodeProgress, BackupData, InterviewReview, KnowledgeNote, StatusHistory, WorkflowNode } from '@/types/application'
 import { createId } from '@/utils/id'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -51,11 +51,33 @@ function parseReview(value: unknown, applicationIds: Set<string>): InterviewRevi
   return {
     id: optionalString(value.id) ?? createId(),
     applicationId: applicationId && applicationIds.has(applicationId) ? applicationId : undefined,
+    workflowNodeId: optionalString(value.workflowNodeId),
+    stageName: optionalString(value.stageName),
     title: optionalString(value.title) ?? '未命名面试复盘',
     content: value.content,
     createdAt: timestamp(value.createdAt),
     updatedAt: timestamp(value.updatedAt),
   }
+}
+
+function parseWorkflowNodes(value: unknown, legacyStatuses: string[]): WorkflowNode[] {
+  const rawNodes = Array.isArray(value) ? value : []
+  const source: unknown[] = rawNodes.length
+    ? rawNodes
+    : [...DEFAULT_WORKFLOW_NODES, ...legacyStatuses.map((name) => ({ id: createId(), name, hasReview: false }))]
+  const ids = new Set<string>()
+  const names = new Set<string>()
+  const nodes = source.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const name = optionalString(item.name)
+    if (!name || names.has(name)) return []
+    names.add(name)
+    const requestedId = optionalString(item.id) ?? createId()
+    const id = ids.has(requestedId) ? createId() : requestedId
+    ids.add(id)
+    return [{ id, name, hasReview: item.hasReview === true, isTerminal: item.isTerminal === true }]
+  })
+  return nodes.length ? nodes : DEFAULT_WORKFLOW_NODES
 }
 
 function parseKnowledgeNote(value: unknown): KnowledgeNote {
@@ -80,6 +102,21 @@ function parseHistory(value: unknown, applicationId: string): StatusHistory {
     time: optionalTime(value.time),
     note: optionalString(value.note),
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+  }
+}
+
+function parseNodeProgress(value: unknown): ApplicationNodeProgress {
+  if (!isRecord(value)) throw new Error('节点进度格式错误')
+  const scheduledAt = optionalString(value.scheduledAt)
+  if (scheduledAt && !/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(scheduledAt)) throw new Error('节点时间格式错误')
+  const reminder = value.reminderMinutesBefore
+  return {
+    workflowNodeId: requiredString(value.workflowNodeId, 'nodeProgress.workflowNodeId'),
+    scheduledAt,
+    state: value.state === 'completed' ? 'completed' : 'active',
+    reminderMinutesBefore: typeof reminder === 'number' && Number.isInteger(reminder) && reminder >= 0 ? reminder : undefined,
+    reminderSentAt: typeof value.reminderSentAt === 'number' && value.reminderSentAt > 0 ? value.reminderSentAt : undefined,
+    updatedAt: timestamp(value.updatedAt),
   }
 }
 
@@ -116,6 +153,7 @@ function parseApplication(value: unknown): Application {
     salary: optionalString(value.salary),
     notes: optionalString(value.notes),
     histories,
+    nodeProgress: Array.isArray(value.nodeProgress) ? value.nodeProgress.map(parseNodeProgress) : [],
     isDemo: false,
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
@@ -169,16 +207,22 @@ export function parseBackup(raw: string): AppStateData {
     return { ...application, id, histories: application.histories.map((history) => ({ ...history, applicationId: id })) }
   })
   const applicationIds = new Set(applications.map(({ id }) => id))
+  const workflowNodes = parseWorkflowNodes(data.workflowNodes, customStatuses)
+  const workflowNames = new Set(workflowNodes.map((node) => node.name))
+  discoveredStatuses.forEach((name) => {
+    if (!workflowNames.has(name)) workflowNodes.push({ id: createId(), name, hasReview: false })
+  })
+  const workflowNodeIds = new Set(workflowNodes.map((node) => node.id))
   const reviewIds = new Set<string>()
-  const linkedApplicationIds = new Set<string>()
+  const linkedNodeKeys = new Set<string>()
   const reviews = (Array.isArray(data.reviews) ? data.reviews : []).map((value) => parseReview(value, applicationIds)).map((review) => {
     const id = reviewIds.has(review.id) ? createId() : review.id
     reviewIds.add(id)
-    const applicationId = review.applicationId && !linkedApplicationIds.has(review.applicationId)
-      ? review.applicationId
-      : undefined
-    if (applicationId) linkedApplicationIds.add(applicationId)
-    return { ...review, id, applicationId }
+    const workflowNodeId = review.workflowNodeId && workflowNodeIds.has(review.workflowNodeId) ? review.workflowNodeId : undefined
+    const key = review.applicationId && workflowNodeId ? `${review.applicationId}:${workflowNodeId}` : undefined
+    if (key && linkedNodeKeys.has(key)) return { ...review, id, workflowNodeId: undefined, stageName: undefined }
+    if (key) linkedNodeKeys.add(key)
+    return { ...review, id, workflowNodeId }
   })
   const knowledgeNoteIds = new Set<string>()
   const knowledgeNotes = (Array.isArray(data.knowledgeNotes) ? data.knowledgeNotes : []).map(parseKnowledgeNote).map((note) => {
@@ -191,7 +235,7 @@ export function parseBackup(raw: string): AppStateData {
     applications,
     reviews,
     knowledgeNotes,
-    customStatuses: [...customStatuses, ...new Set(discoveredStatuses)],
+    workflowNodes,
     theme: data.theme === 'light' || data.theme === 'dark' || data.theme === 'system' ? data.theme : 'system',
     initialized: true,
   }

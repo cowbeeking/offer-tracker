@@ -6,6 +6,8 @@ import { toDateInput } from '@/utils/date'
 
 function draftFromApplication(application?: Application): ApplicationDraft {
   const today = toDateInput()
+  const now = new Date()
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   return {
     companyName: application?.companyName ?? '',
     positionName: application?.positionName ?? '',
@@ -20,7 +22,7 @@ function draftFromApplication(application?: Application): ApplicationDraft {
     salary: application?.salary ?? '',
     notes: application?.notes ?? '',
     eventDate: today,
-    eventTime: '',
+    eventTime: currentTime,
   }
 }
 

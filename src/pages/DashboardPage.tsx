@@ -4,17 +4,18 @@ import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
 import { INTERVIEW_STATUSES } from '@/constants/statuses'
 import { useApplicationMetrics } from '@/hooks/useApplicationMetrics'
-import type { Application, PageKey } from '@/types/application'
+import type { Application, PageKey, WorkflowNode } from '@/types/application'
 
 interface DashboardPageProps {
   applications: Application[]
   statuses: string[]
+  workflowNodes: WorkflowNode[]
   onNavigate: (page: PageKey) => void
   onOpen: (application: Application) => void
 }
 
-export function DashboardPage({ applications, statuses, onNavigate, onOpen }: DashboardPageProps): JSX.Element {
-  const metrics = useApplicationMetrics(applications)
+export function DashboardPage({ applications, statuses, workflowNodes, onNavigate, onOpen }: DashboardPageProps): JSX.Element {
+  const metrics = useApplicationMetrics(applications, workflowNodes)
   const progress = statuses
     .filter((status) => !['待投递', '已拒绝', '已结束'].includes(status))
     .map((status) => ({ status, count: applications.filter((item) => item.status === status).length }))
@@ -75,12 +76,12 @@ export function DashboardPage({ applications, statuses, onNavigate, onOpen }: Da
         <div className="panel-heading"><div><span className="section-kicker">Today</span><h2>今日待办</h2></div><button className="text-button" onClick={() => onNavigate('applications')}>全部投递 <ArrowRight size={14} /></button></div>
         {metrics.todayEvents.length ? (
           <div className="todo-list">
-            {metrics.todayEvents.map(({ application, history }) => (
-              <button key={history.id} onClick={() => onOpen(application)}>
-                <span className="todo-time">{history.time || '今天'}</span>
+            {metrics.todayEvents.map(({ application, progress, node }) => (
+              <button key={`${application.id}:${progress.workflowNodeId}`} onClick={() => onOpen(application)}>
+                <span className="todo-time">{progress.scheduledAt?.slice(11, 16) || '今天'}</span>
                 <span className="todo-line" />
-                <span className="todo-main"><strong>{application.companyName} · {application.positionName}</strong><small>{history.status}{history.note ? ` · ${history.note}` : ''}</small></span>
-                <StatusTag status={history.status} dot={false} />
+                <span className="todo-main"><strong>{application.companyName} · {application.positionName}</strong><small>{node.name} · 进行中{progress.reminderMinutesBefore !== undefined ? ` · 提前 ${progress.reminderMinutesBefore} 分钟提醒` : ''}</small></span>
+                <StatusTag status={node.name} dot={false} />
               </button>
             ))}
           </div>

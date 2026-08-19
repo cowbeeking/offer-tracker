@@ -1,9 +1,9 @@
 import { useMemo } from 'react'
 import { CLOSED_STATUSES, INTERVIEW_STATUSES } from '@/constants/statuses'
-import type { Application } from '@/types/application'
+import type { Application, WorkflowNode } from '@/types/application'
 import { daysUntil, lastNDays, toDateInput } from '@/utils/date'
 
-export function useApplicationMetrics(applications: Application[]) {
+export function useApplicationMetrics(applications: Application[], workflowNodes: WorkflowNode[] = []) {
   return useMemo(() => {
     const total = applications.length
     const interviews = applications.filter((item) => INTERVIEW_STATUSES.includes(item.status)).length
@@ -19,11 +19,14 @@ export function useApplicationMetrics(applications: Application[]) {
     const today = toDateInput()
     const todayEvents = applications
       .flatMap((application) =>
-        application.histories
-          .filter((history) => history.date === today && (history.time || INTERVIEW_STATUSES.includes(history.status) || history.status === '笔试'))
-          .map((history) => ({ application, history })),
+        application.nodeProgress
+          .filter((progress) => progress.state === 'active' && progress.scheduledAt?.slice(0, 10) === today)
+          .flatMap((progress) => {
+            const node = workflowNodes.find((item) => item.id === progress.workflowNodeId)
+            return node ? [{ application, progress, node }] : []
+          }),
       )
-      .sort((a, b) => (a.history.time || '23:59').localeCompare(b.history.time || '23:59'))
+      .sort((a, b) => (a.progress.scheduledAt ?? '').localeCompare(b.progress.scheduledAt ?? ''))
     const trend = lastNDays(30).map((date) => ({
       date,
       count: applications.filter((item) => item.applicationDate === date).length,
@@ -42,5 +45,5 @@ export function useApplicationMetrics(applications: Application[]) {
       todayEvents,
       trend,
     }
-  }, [applications])
+  }, [applications, workflowNodes])
 }

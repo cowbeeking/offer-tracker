@@ -4,16 +4,17 @@ import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import type { Application, InterviewReview } from '@/types/application'
+import type { Application, InterviewReview, WorkflowNode } from '@/types/application'
 import { createInterviewReview } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
 
 interface ReviewsPageProps {
   applications: Application[]
   reviews: InterviewReview[]
+  workflowNodes: WorkflowNode[]
   openRequest?: { id: string; token: number }
   onAdd: (review: InterviewReview) => void
-  onUpdate: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'title' | 'content'>>) => void
+  onUpdate: (id: string, changes: Partial<Pick<InterviewReview, 'applicationId' | 'workflowNodeId' | 'stageName' | 'title' | 'content'>>) => void
   onDelete: (id: string) => void
   onNotify: (message: string, tone?: 'success' | 'error') => void
 }
@@ -29,7 +30,7 @@ function formatUpdatedAt(timestamp: number): string {
   }).format(timestamp)
 }
 
-export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdate, onDelete, onNotify }: ReviewsPageProps): JSX.Element {
+export function ReviewsPage({ applications, reviews, workflowNodes, openRequest, onAdd, onUpdate, onDelete, onNotify }: ReviewsPageProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string>()
   const [query, setQuery] = useState('')
   const [mode, setMode] = useState<ReviewMode>('live')
@@ -39,7 +40,9 @@ export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdat
     `${a.companyName}${a.positionName}`.localeCompare(`${b.companyName}${b.positionName}`, 'zh-CN')),
   [applications])
   const sortedReviews = useMemo(() => [...reviews].sort((a, b) => b.updatedAt - a.updatedAt), [reviews])
-  const linkedReviewByApplication = useMemo(() => new Map(reviews.flatMap((review) => review.applicationId ? [[review.applicationId, review.id] as const] : [])), [reviews])
+  const reviewByApplicationNode = useMemo(() => new Map<string, string>(reviews.flatMap((review) =>
+    review.applicationId && review.workflowNodeId ? [[`${review.applicationId}:${review.workflowNodeId}`, review.id] as const] : [])), [reviews])
+  const reviewNodes = useMemo(() => workflowNodes.filter((node) => node.hasReview), [workflowNodes])
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
     if (!needle) return sortedReviews
@@ -111,7 +114,7 @@ export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdat
                     <span className="review-note-icon"><FileText size={15} /></span>
                     <span className="review-note-copy">
                       <strong>{review.title.trim() || '未命名面试复盘'}</strong>
-                      <small>{application ? `${application.companyName} · ${application.positionName}` : '未关联投递'}</small>
+                      <small>{application ? `${application.companyName} · ${application.positionName}${review.stageName ? ` · ${review.stageName}` : ''}` : '未关联投递'}</small>
                       <time>{formatUpdatedAt(review.updatedAt)}</time>
                     </span>
                   </button>
@@ -142,18 +145,29 @@ export function ReviewsPage({ applications, reviews, openRequest, onAdd, onUpdat
               <span>关联投递</span>
               <select value={selected.applicationId ?? ''} onChange={(event) => {
                 const applicationId = event.target.value || undefined
-                if (applicationId && linkedReviewByApplication.get(applicationId) && linkedReviewByApplication.get(applicationId) !== selected.id) {
-                  onNotify('这条投递已经有关联复盘', 'error')
+                const key = applicationId && selected.workflowNodeId ? `${applicationId}:${selected.workflowNodeId}` : undefined
+                if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
+                  onNotify('这条投递的该流程节点已经有复盘', 'error')
                   return
                 }
                 onUpdate(selected.id, { applicationId })
               }}>
                 <option value="">不关联投递</option>
-                {sortedApplications.map((application) => {
-                  const linkedReviewId = linkedReviewByApplication.get(application.id)
-                  const occupied = Boolean(linkedReviewId && linkedReviewId !== selected.id)
-                  return <option value={application.id} key={application.id} disabled={occupied}>{application.companyName} · {application.positionName}{occupied ? '（已有复盘）' : ''}</option>
-                })}
+                {sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}
+              </select>
+              <span>流程节点</span>
+              <select value={selected.workflowNodeId ?? ''} onChange={(event) => {
+                const workflowNodeId = event.target.value || undefined
+                const node = workflowNodes.find((item) => item.id === workflowNodeId)
+                const key = selected.applicationId && workflowNodeId ? `${selected.applicationId}:${workflowNodeId}` : undefined
+                if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
+                  onNotify('这条投递的该流程节点已经有复盘', 'error')
+                  return
+                }
+                onUpdate(selected.id, { workflowNodeId, stageName: node?.name })
+              }}>
+                <option value="">未指定节点</option>
+                {reviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}
               </select>
               <i />
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>

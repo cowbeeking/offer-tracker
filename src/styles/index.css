@@ -760,6 +760,18 @@
     @apply grid min-h-[76px] place-items-center rounded-lg border border-dashed border-line px-4 text-center text-[10px] text-muted/60;
   }
 
+  .board-drop-form {
+    @apply px-5 pt-5;
+  }
+
+  .board-drop-form > .field + .field {
+    @apply mt-3;
+  }
+
+  .board-drop-form > .modal-footer {
+    @apply -mx-5 mt-5;
+  }
+
   .stats-grid {
     @apply mb-5 grid grid-cols-4 gap-3.5;
   }
@@ -939,6 +951,38 @@
     @apply absolute right-2.5 size-1.5 rounded-full bg-accent;
   }
 
+  .system-setting-row {
+    @apply mt-4 flex items-center gap-3 rounded-lg border border-line bg-canvas/45 px-3 py-2.5;
+  }
+
+  .system-setting-row > div {
+    @apply flex min-w-0 flex-1 flex-col;
+  }
+
+  .system-setting-row strong {
+    @apply text-[11px] font-medium;
+  }
+
+  .system-setting-row small {
+    @apply mt-0.5 text-[9px] text-muted;
+  }
+
+  .switch-control {
+    @apply relative h-5 w-9 flex-none rounded-full bg-ink/15 transition disabled:opacity-40;
+  }
+
+  .switch-control span {
+    @apply absolute left-0.5 top-0.5 size-4 rounded-full bg-white shadow-sm transition;
+  }
+
+  .switch-control.active {
+    @apply bg-accent;
+  }
+
+  .switch-control.active span {
+    @apply translate-x-4;
+  }
+
   .data-actions {
     @apply mt-5 grid grid-cols-3 gap-3;
   }
@@ -1021,6 +1065,62 @@
 
   .settings-hint {
     @apply mt-3 text-[10px] text-muted;
+  }
+
+  .workflow-create-row {
+    @apply items-center;
+  }
+
+  .review-toggle {
+    @apply inline-flex h-8 flex-none cursor-pointer items-center gap-1.5 rounded-md border border-line bg-canvas px-2.5 text-[10px] text-muted transition hover:border-ink/20 hover:text-ink;
+  }
+
+  .review-toggle input {
+    @apply size-3.5 accent-[rgb(var(--accent))];
+  }
+
+  .workflow-node-list {
+    @apply mt-4 space-y-1.5;
+  }
+
+  .workflow-node-row {
+    @apply flex min-h-10 items-center gap-2 rounded-lg border border-line bg-canvas/45 px-2.5 transition hover:border-ink/20;
+  }
+
+  .workflow-node-row.dragging {
+    @apply border-accent/40 bg-accent/5 opacity-50;
+  }
+
+  .workflow-drag {
+    @apply cursor-grab text-muted/60 active:cursor-grabbing;
+  }
+
+  .workflow-index {
+    @apply grid size-5 place-items-center rounded-full bg-ink/5 text-[9px] text-muted;
+  }
+
+  .workflow-node-row > strong {
+    @apply min-w-0 flex-1 text-[11px] font-medium;
+  }
+
+  .workflow-node-row > small {
+    @apply rounded-full bg-rose-50 px-2 py-0.5 text-[8px] text-rose-600;
+  }
+
+  .dark .workflow-node-row > small {
+    @apply bg-rose-950/40 text-rose-300;
+  }
+
+  .review-toggle.compact {
+    @apply h-7 min-w-[92px] justify-center border-transparent bg-transparent px-2;
+  }
+
+  .workflow-delete {
+    @apply grid size-7 place-items-center rounded-md text-muted transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-25;
+  }
+
+  .dark .workflow-delete:hover {
+    @apply bg-red-950/40 text-red-300;
   }
 
   .modal-backdrop,
@@ -1240,11 +1340,19 @@
     @apply mt-4;
   }
 
-  .status-step {
-    @apply relative flex min-h-11 w-full items-center gap-3 rounded-md px-1.5 py-1 text-left transition hover:bg-canvas;
+  .status-step-row {
+    @apply relative min-h-11 py-1;
   }
 
-  .status-step:not(:last-child)::after {
+  .status-step-primary {
+    @apply flex items-center gap-2;
+  }
+
+  .status-step {
+    @apply flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md px-1.5 py-1 text-left transition hover:bg-canvas;
+  }
+
+  .status-step-row:not(:last-child)::after {
     content: '';
     position: absolute;
     left: 17px;
@@ -1254,11 +1362,11 @@
     background: rgb(var(--line));
   }
 
-  .status-step.past:not(:last-child)::after {
+  .status-step-row.past:not(:last-child)::after {
     background: rgb(var(--accent) / 0.28);
   }
 
-  .status-step.current {
+  .status-step-row.current .status-step {
     @apply bg-accent/5;
   }
 
@@ -1266,15 +1374,15 @@
     @apply relative z-[1] grid size-6 flex-none place-items-center rounded-full border border-line bg-panel text-[8px] font-medium text-muted;
   }
 
-  .status-step.past .step-marker {
+  .status-step-row.past .step-marker {
     @apply border-accent/20 bg-accent/10 text-accent;
   }
 
-  .status-step.current .step-marker {
+  .status-step-row.current .step-marker {
     @apply border-accent bg-accent text-white shadow-sm;
   }
 
-  .dark .status-step.current .step-marker {
+  .dark .status-step-row.current .step-marker {
     @apply text-[#18201c];
   }
 
@@ -1294,12 +1402,61 @@
     @apply mt-0.5 text-[8px] text-muted;
   }
 
-  .status-step.current .step-content strong {
+  .status-step-row.current .step-content strong {
     @apply text-accent;
   }
 
   .current-label {
     @apply rounded-full bg-accent/10 px-2 py-1 text-[8px] font-medium text-accent;
+  }
+
+  .node-review-action {
+    @apply relative z-[2] inline-flex h-7 flex-none items-center gap-1 rounded-md border px-2 text-[9px] font-medium transition;
+  }
+
+  .node-review-action.pending {
+    @apply border-amber-200/80 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100;
+  }
+
+  .node-review-action.completed {
+    @apply border-emerald-200/80 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100;
+  }
+
+  .dark .node-review-action.pending {
+    @apply border-amber-800/70 bg-amber-950/40 text-amber-300;
+  }
+
+  .dark .node-review-action.completed {
+    @apply border-emerald-800/70 bg-emerald-950/40 text-emerald-300;
+  }
+
+  .node-progress-editor {
+    @apply ml-9 mt-1 grid grid-cols-[1.35fr_0.75fr_1fr] gap-1.5 rounded-md border border-line bg-canvas/45 p-1.5;
+  }
+
+  .node-progress-editor label {
+    @apply flex min-w-0 flex-col gap-1;
+  }
+
+  .node-progress-editor label > span:first-child {
+    @apply text-[8px] font-medium text-muted;
+  }
+
+  .node-progress-editor input,
+  .node-progress-editor select {
+    @apply h-7 min-w-0 rounded border border-line bg-input px-1.5 text-[9px] text-ink outline-none focus:border-accent/50;
+  }
+
+  .reminder-field > span:last-child {
+    @apply flex items-center;
+  }
+
+  .reminder-field input {
+    @apply min-w-0 flex-1 rounded-r-none;
+  }
+
+  .reminder-field i {
+    @apply grid h-7 flex-none place-items-center rounded-r border border-l-0 border-line bg-panel px-1.5 text-[8px] not-italic text-muted;
   }
 
   .end-statuses {
@@ -1417,6 +1574,91 @@
 
   .dark .toast-success > span { @apply bg-emerald-950/60 text-emerald-300; }
   .dark .toast-error > span { @apply bg-red-950/60 text-red-300; }
+
+  .status-undo {
+    @apply fixed bottom-5 left-1/2 z-[75] flex min-w-[320px] -translate-x-1/2 items-center gap-3 rounded-xl border border-line bg-panel px-3.5 py-3 shadow-2xl;
+    animation: toast-in 180ms ease-out;
+  }
+
+  .status-undo > span {
+    @apply grid size-7 flex-none place-items-center rounded-full bg-emerald-50 text-emerald-600;
+  }
+
+  .dark .status-undo > span {
+    @apply bg-emerald-950/60 text-emerald-300;
+  }
+
+  .status-undo p {
+    @apply min-w-0 flex-1;
+  }
+
+  .status-undo p strong,
+  .status-undo p small {
+    @apply block;
+  }
+
+  .status-undo p strong {
+    @apply text-[11px] font-semibold text-ink;
+  }
+
+  .status-undo p small {
+    @apply mt-0.5 text-[9px] text-muted;
+  }
+
+  .status-undo button {
+    @apply inline-flex flex-none items-center gap-1 rounded-lg border border-line bg-canvas px-3 py-1.5 text-[10px] font-semibold text-accent transition hover:border-accent/30 hover:bg-accent/5;
+  }
+
+  .node-reminder {
+    @apply fixed bottom-6 right-6 z-[80] flex w-[360px] items-center gap-3 overflow-hidden rounded-2xl border border-amber-200 bg-panel p-4 pr-11 shadow-2xl;
+    animation: reminder-in 420ms cubic-bezier(.2,.9,.2,1), reminder-glow 1.8s ease-in-out 450ms 2;
+  }
+
+  .node-reminder::before {
+    content: '';
+    @apply absolute inset-y-0 left-0 w-1 bg-amber-400;
+  }
+
+  .dark .node-reminder {
+    @apply border-amber-800;
+  }
+
+  .node-reminder-icon {
+    @apply grid size-11 flex-none place-items-center rounded-full bg-amber-100 text-amber-700;
+    animation: reminder-bell 900ms ease-in-out 2;
+  }
+
+  .dark .node-reminder-icon {
+    @apply bg-amber-950/60 text-amber-300;
+  }
+
+  .node-reminder-copy {
+    @apply flex min-w-0 flex-1 flex-col;
+  }
+
+  .node-reminder-copy small {
+    @apply text-[9px] font-semibold uppercase tracking-[0.15em] text-amber-700;
+  }
+
+  .node-reminder-copy strong {
+    @apply mt-0.5 truncate text-xs font-semibold;
+  }
+
+  .node-reminder-copy p {
+    @apply mt-0.5 truncate text-[10px] text-muted;
+  }
+
+  .node-reminder-copy time {
+    @apply mt-1.5 flex items-center gap-1 text-[9px] text-muted;
+  }
+
+  .node-reminder-open {
+    @apply flex-none rounded-md bg-ink px-2.5 py-1.5 text-[9px] font-medium text-canvas transition hover:opacity-85;
+  }
+
+  .node-reminder-close {
+    @apply absolute right-2.5 top-2.5 grid size-6 place-items-center rounded-full text-muted transition hover:bg-ink/5 hover:text-ink;
+  }
 
   .app-loading {
     @apply flex h-full items-center justify-center gap-3 bg-canvas;
@@ -1862,6 +2104,24 @@
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes reminder-in {
+  from { opacity: 0; transform: translateX(28px) scale(0.94); }
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes reminder-glow {
+  0%, 100% { box-shadow: 0 18px 55px rgb(0 0 0 / 0.16); }
+  50% { box-shadow: 0 18px 62px rgb(245 158 11 / 0.28); }
+}
+
+@keyframes reminder-bell {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(12deg); }
+  40% { transform: rotate(-10deg); }
+  60% { transform: rotate(7deg); }
+  80% { transform: rotate(-4deg); }
 }
 
 @media (max-width: 1200px) {

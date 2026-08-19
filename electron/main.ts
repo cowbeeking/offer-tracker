@@ -92,6 +92,22 @@ app.whenReady().then(() => {
     return true
   })
 
+  ipcMain.handle('app:get-auto-launch', () => app.getLoginItemSettings().openAtLogin)
+  ipcMain.handle('app:set-auto-launch', (_event, enabled: boolean) => {
+    app.setLoginItemSettings({ openAtLogin: Boolean(enabled), openAsHidden: false })
+    return app.getLoginItemSettings().openAtLogin
+  })
+  ipcMain.handle('app:show-reminder', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    if (!window) return false
+    if (window.isMinimized()) window.restore()
+    window.show()
+    window.flashFrame(true)
+    shell.beep()
+    setTimeout(() => { if (!window.isDestroyed()) window.flashFrame(false) }, 5000)
+    return true
+  })
+
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

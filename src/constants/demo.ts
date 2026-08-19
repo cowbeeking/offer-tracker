@@ -1,3 +1,4 @@
+import { DEFAULT_WORKFLOW_NODES } from '@/types/application'
 import type { Application } from '@/types/application'
 import { toDateInput } from '@/utils/date'
 import { createId } from '@/utils/id'
@@ -43,6 +44,16 @@ function makeDemo(
     notes: '关注官网与邮箱通知，及时准备下一阶段。',
     link: 'https://example.com/campus',
     histories,
+    nodeProgress: histories.flatMap((history) => {
+      const node = DEFAULT_WORKFLOW_NODES.find((item) => item.name === history.status)
+      if (!node) return []
+      return [{
+        workflowNodeId: node.id,
+        scheduledAt: history.time ? `${history.date}T${history.time}` : undefined,
+        state: history.status === status ? 'active' as const : 'completed' as const,
+        updatedAt: history.createdAt,
+      }]
+    }),
     isDemo: true,
     createdAt,
     updatedAt: createdAt + Math.max(statusIndex, 0) * 3 * 86400000,
