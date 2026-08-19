@@ -1,29 +1,39 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { CalendarDays, GripVertical, MapPin, Search } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
-import type { Application } from '@/types/application'
-import { formatShortDate } from '@/utils/date'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
+import type { Application, WorkflowNode } from '@/types/application'
+import { formatShortDateTime } from '@/utils/date'
+import { getCurrentNodeDateTime } from '@/utils/workflow'
 
 interface BoardPageProps {
   applications: Application[]
   statuses: string[]
-  onAdd: () => void
+  workflowNodes: WorkflowNode[]
   onOpen: (application: Application) => void
-  onStatusChange: (id: string, status: string) => void
+  onStatusChange: (id: string, status: string, event: { date: string; time: string; note?: string }) => void
+  onInvalidMove: (message: string) => void
 }
 
-export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChange }: BoardPageProps): JSX.Element {
+function currentLocalDateTime(): string {
+  const now = new Date()
+  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+}
+
+export function BoardPage({ applications, statuses, workflowNodes, onOpen, onStatusChange, onInvalidMove }: BoardPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [overStatus, setOverStatus] = useState<string | null>(null)
+  const [pendingDrop, setPendingDrop] = useState<{ application: Application; status: string; scheduledAt: string; note: string }>()
   const boardScrollRef = useRef<HTMLDivElement>(null)
   const dragAutoScrollFrameRef = useRef<number | null>(null)
   const dragAutoScrollVelocityRef = useRef(0)
   const visible = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
-    return applications.filter((item) => !needle || `${item.companyName} ${item.positionName}`.toLocaleLowerCase().includes(needle))
+    return applications.filter((item) => !needle || `${item.companyName} ${item.positionName} ${item.preferenceOrder ? `第${item.preferenceOrder}志愿` : ''}`.toLocaleLowerCase().includes(needle))
   }, [applications, query])
   const boardStatuses = statuses.filter((status) => status !== '待投递' || visible.some((item) => item.status === status))
 
@@ -89,10 +99,30 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
 
   const handleDrop = (event: DragEvent, status: string): void => {
     event.preventDefault()
-    if (draggedId) onStatusChange(draggedId, status)
+    const application = applications.find((item) => item.id === draggedId)
+    if (application && application.status !== status) {
+      const currentIndex = statuses.indexOf(application.status)
+      const targetIndex = statuses.indexOf(status)
+      if (currentIndex >= 0 && targetIndex >= 0 && targetIndex < currentIndex) {
+        onInvalidMove('招聘流程不能向前拖动；如需回退，请使用卡片上的“撤销”')
+      } else {
+        setPendingDrop({ application, status, scheduledAt: currentLocalDateTime(), note: '' })
+      }
+    }
     stopDragAutoScroll()
     setDraggedId(null)
     setOverStatus(null)
+  }
+
+  const confirmDrop = (event: FormEvent): void => {
+    event.preventDefault()
+    if (!pendingDrop?.scheduledAt) return
+    onStatusChange(pendingDrop.application.id, pendingDrop.status, {
+      date: pendingDrop.scheduledAt.slice(0, 10),
+      time: pendingDrop.scheduledAt.slice(11, 16),
+      note: pendingDrop.note.trim() || undefined,
+    })
+    setPendingDrop(undefined)
   }
 
   useEffect(() => {
@@ -119,7 +149,7 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
   return (
     <div className="page board-page">
       <header className="page-heading">
-        <div><span className="eyebrow">Pipeline board</span><h1>流程看板</h1><p>拖动卡片即可更新招聘阶段，并自动记录流程历史。</p></div>
+        <div><span className="eyebrow">Pipeline board</span><h1>流程看板</h1><p>只能向后拖动并填写节点时间；误拖请在投递详情的招聘流程中撤销。</p></div>
       </header>
       <div className="board-toolbar">
         <label className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索看板中的公司 / 岗位" /></label>
@@ -139,10 +169,12 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
             {boardStatuses.map((status) => {
               const items = visible
                 .filter((application) => application.status === status)
-                .sort((first, second) => first.applicationDate.localeCompare(second.applicationDate) || first.createdAt - second.createdAt)
+                .sort((first, second) => getCurrentNodeDateTime(first, workflowNodes).localeCompare(getCurrentNodeDateTime(second, workflowNodes)) || first.createdAt - second.createdAt)
+              const draggedApplication = applications.find((application) => application.id === draggedId)
+              const isEarlierTarget = Boolean(draggedApplication && statuses.indexOf(status) < statuses.indexOf(draggedApplication.status))
               return (
                 <section
-                  className={`kanban-column ${overStatus === status ? 'drag-over' : ''}`}
+                  className={`kanban-column ${overStatus === status ? isEarlierTarget ? 'drag-blocked' : 'drag-over' : ''}`}
                   key={status}
                   onDragOver={(event) => { event.preventDefault(); setOverStatus(status) }}
                   onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node)) setOverStatus(null) }}
@@ -161,12 +193,15 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
                       >
                         <button className="card-main" onClick={() => onOpen(application)}>
                           <span className="company-avatar">{application.companyName.slice(0, 1)}</span>
-                          <span><strong>{application.companyName}</strong><small>{application.positionName}</small></span>
+                          <span className="card-copy"><strong>{application.companyName}</strong><small>{application.positionName}</small></span>
+                          {application.preferenceOrder && <span className="preference-badge">第 {application.preferenceOrder} 志愿</span>}
                         </button>
                         <div className="card-meta">
-                          <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>
+                          <span title="当前节点时间"><CalendarDays size={13} />{formatShortDateTime(getCurrentNodeDateTime(application, workflowNodes))}</span>
                           {application.location && <span><MapPin size={13} />{application.location}</span>}
-                          <GripVertical size={15} className="drag-handle" />
+                          <div className="card-actions">
+                            <GripVertical size={15} className="drag-handle" />
+                          </div>
                         </div>
                       </article>
                     ))}
@@ -177,7 +212,14 @@ export function BoardPage({ applications, statuses, onAdd, onOpen, onStatusChang
             })}
           </div>
         </div>
-      ) : <section className="panel"><EmptyState title="看板还是空的" description="新增投递后，可在不同招聘阶段之间直接拖动。" action={<Button variant="primary" size="sm" onClick={onAdd}>新增投递</Button>} /></section>}
+      ) : <section className="panel"><EmptyState title="看板还是空的" description="请先在投递记录中添加机会，再到这里推进招聘阶段。" /></section>}
+      <Modal open={Boolean(pendingDrop)} width="sm" title={`进入「${pendingDrop?.status ?? ''}」`} description={pendingDrop ? `${pendingDrop.application.companyName} · ${pendingDrop.application.positionName}` : ''} onClose={() => setPendingDrop(undefined)}>
+        <form className="board-drop-form" onSubmit={confirmDrop}>
+          <label className="field"><span>节点日期与时间 <em>*</em></span><input autoFocus required type="datetime-local" step="60" value={pendingDrop?.scheduledAt ?? ''} onChange={(event) => setPendingDrop((current) => current ? { ...current, scheduledAt: event.target.value } : current)} /></label>
+          <label className="field"><span>节点备注</span><input value={pendingDrop?.note ?? ''} onChange={(event) => setPendingDrop((current) => current ? { ...current, note: event.target.value } : current)} placeholder="例如：收到一面通知" /></label>
+          <footer className="modal-footer"><Button type="button" onClick={() => setPendingDrop(undefined)}>取消</Button><Button type="submit" variant="primary">确认更新</Button></footer>
+        </form>
+      </Modal>
     </div>
   )
 }

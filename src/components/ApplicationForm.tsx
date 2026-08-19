@@ -1,13 +1,17 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { Application, ApplicationDraft } from '@/types/application'
 import { toDateInput } from '@/utils/date'
 
 function draftFromApplication(application?: Application): ApplicationDraft {
   const today = toDateInput()
+  const now = new Date()
+  const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
   return {
     companyName: application?.companyName ?? '',
     positionName: application?.positionName ?? '',
+    preferenceOrder: application?.preferenceOrder ? String(application.preferenceOrder) : '',
     applicationDate: application?.applicationDate ?? today,
     deadline: application?.deadline ?? '',
     status: application?.status ?? '已投递',
@@ -18,7 +22,7 @@ function draftFromApplication(application?: Application): ApplicationDraft {
     salary: application?.salary ?? '',
     notes: application?.notes ?? '',
     eventDate: today,
-    eventTime: '',
+    eventTime: currentTime,
   }
 }
 
@@ -26,7 +30,7 @@ interface ApplicationFormProps {
   application?: Application
   statuses: string[]
   companies: string[]
-  onSubmit: (draft: ApplicationDraft) => void
+  onSubmit: (draft: ApplicationDraft, additionalDrafts?: ApplicationDraft[]) => void
   onCancel: () => void
 }
 
@@ -34,6 +38,7 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
   const [draft, setDraft] = useState<ApplicationDraft>(() => draftFromApplication(application))
   const [error, setError] = useState('')
   const [eventDateTouched, setEventDateTouched] = useState(false)
+  const [additionalPositions, setAdditionalPositions] = useState<string[]>([])
   const companyOptions = useMemo(() => [...new Set(companies)].sort((a, b) => a.localeCompare(b, 'zh-CN')), [companies])
 
   const setField = <K extends keyof ApplicationDraft>(field: K, value: ApplicationDraft[K]): void => {
@@ -51,6 +56,19 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
       setError('招聘链接需要以 http:// 或 https:// 开头。')
       return
     }
+    if (draft.preferenceOrder && (!/^\d+$/.test(draft.preferenceOrder) || Number(draft.preferenceOrder) < 1)) {
+      setError('志愿顺序需要填写大于 0 的整数。')
+      return
+    }
+    if (additionalPositions.some((position) => !position.trim())) {
+      setError('请填写所有追加志愿的岗位名称。')
+      return
+    }
+    const positions = [draft.positionName, ...additionalPositions].map((position) => position.trim())
+    if (new Set(positions).size !== positions.length) {
+      setError('同一公司的多个志愿岗位不能完全相同。')
+      return
+    }
     if (draft.deadline && draft.deadline < draft.applicationDate) {
       setError('截止日期不能早于投递日期。')
       return
@@ -60,7 +78,14 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
       setError('流程事件日期不能早于投递日期。')
       return
     }
-    onSubmit(draft)
+    const primaryDraft = additionalPositions.length && !draft.preferenceOrder ? { ...draft, preferenceOrder: '1' } : draft
+    const primaryOrder = Number(primaryDraft.preferenceOrder || '1')
+    const additionalDrafts = additionalPositions.map((positionName, index) => ({
+      ...draft,
+      positionName: positionName.trim(),
+      preferenceOrder: String(primaryOrder + index + 1),
+    }))
+    onSubmit(primaryDraft, additionalDrafts)
   }
 
   return (
@@ -87,6 +112,32 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
             placeholder="例如：后端开发工程师"
           />
         </label>
+        <div className="additional-preferences field-span-2">
+          <div className="additional-preferences-head">
+            <div><strong>更多志愿</strong><span>沿用同一公司的日期、状态和其他信息，每个志愿保存为独立投递。</span></div>
+            <Button type="button" size="sm" icon={<Plus size={13} />} onClick={() => {
+              if (!draft.preferenceOrder) setField('preferenceOrder', '1')
+              setAdditionalPositions((current) => [...current, ''])
+            }}>更多志愿</Button>
+          </div>
+          {additionalPositions.length > 0 && <div className="additional-preference-list">
+            {additionalPositions.map((position, index) => {
+              const order = Number(draft.preferenceOrder || '1') + index + 1
+              const isLast = index === additionalPositions.length - 1
+              return <label className="field additional-preference-field" key={index}>
+                <span>第 {order} 志愿岗位名称 <em>*</em></span>
+                <div className="additional-preference-input">
+                  <input value={position} onChange={(event) => {
+                    if (error) setError('')
+                    const next = event.target.value
+                    setAdditionalPositions((current) => current.map((item, itemIndex) => itemIndex === index ? next : item))
+                  }} placeholder={`例如：第 ${order} 志愿岗位`} />
+                  {isLast && <button type="button" aria-label={`删除第 ${order} 志愿`} title="删除最后一个志愿" onClick={() => setAdditionalPositions((current) => current.slice(0, -1))}><X size={14} /></button>}
+                </div>
+              </label>
+            })}
+          </div>}
+        </div>
         <label className="field">
           <span>投递日期 <em>*</em></span>
           <input type="date" value={draft.applicationDate} onChange={(event) => {
@@ -104,8 +155,8 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
           <input type="date" value={draft.deadline} onChange={(event) => setField('deadline', event.target.value)} />
         </label>
         <label className="field">
-          <span>当前状态</span>
-          <select value={draft.status} onChange={(event) => setField('status', event.target.value)}>
+          <span>{application ? '当前状态（请在流程看板拖动）' : '初始状态'}</span>
+          <select disabled={Boolean(application)} value={draft.status} onChange={(event) => setField('status', event.target.value)}>
             {statuses.map((status) => <option value={status} key={status}>{status}</option>)}
           </select>
         </label>
@@ -124,6 +175,10 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
         <label className="field">
           <span>薪资</span>
           <input value={draft.salary} onChange={(event) => setField('salary', event.target.value)} placeholder="例如：25k-40k · 15薪" />
+        </label>
+        <label className="field">
+          <span>志愿顺序</span>
+          <input type="number" min="1" step="1" value={draft.preferenceOrder} onChange={(event) => setField('preferenceOrder', event.target.value)} placeholder="例如：1（第 1 志愿）" />
         </label>
         <label className="field field-span-2">
           <span>招聘链接</span>

@@ -20,21 +20,24 @@ interface ApplicationsPageProps {
 export function ApplicationsPage({ applications, statuses, searchRequest, onAdd, onOpen, onEdit, onDelete }: ApplicationsPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('全部状态')
+  const [preference, setPreference] = useState('全部志愿')
   const [company, setCompany] = useState('全部公司')
   const [location, setLocation] = useState('全部地点')
   const [dateRange, setDateRange] = useState('全部日期')
   const companies = useMemo(() => [...new Set(applications.map((item) => item.companyName))].sort((a, b) => a.localeCompare(b, 'zh-CN')), [applications])
   const locations = useMemo(() => [...new Set(applications.map((item) => item.location).filter((item): item is string => Boolean(item)))].sort((a, b) => a.localeCompare(b, 'zh-CN')), [applications])
+  const preferences = useMemo(() => [...new Set(applications.map((item) => item.preferenceOrder).filter((item): item is number => typeof item === 'number'))].sort((a, b) => a - b), [applications])
   const filtered = useMemo(() => applications.filter((item) => {
     const needle = query.trim().toLocaleLowerCase()
-    const matchesQuery = !needle || `${item.companyName} ${item.positionName}`.toLocaleLowerCase().includes(needle)
+    const matchesQuery = !needle || `${item.companyName} ${item.positionName} ${item.preferenceOrder ? `第${item.preferenceOrder}志愿` : ''}`.toLocaleLowerCase().includes(needle)
     const matchesStatus = status === '全部状态' || (status === '面试中' ? ['一面', '二面', '三面', 'HR面'].includes(item.status) : item.status === status)
+    const matchesPreference = preference === '全部志愿' || item.preferenceOrder === Number(preference)
     const matchesCompany = company === '全部公司' || item.companyName === company
     const matchesLocation = location === '全部地点' || item.location === location
     const matchesDate = dateRange === '全部日期' || (dateRange === '最近 7 天' ? isWithinDays(item.applicationDate, 7) : isWithinDays(item.applicationDate, 30))
-    return matchesQuery && matchesStatus && matchesCompany && matchesLocation && matchesDate
-  }).sort((a, b) => b.applicationDate.localeCompare(a.applicationDate)), [applications, company, dateRange, location, query, status])
-  const hasFilters = query || status !== '全部状态' || company !== '全部公司' || location !== '全部地点' || dateRange !== '全部日期'
+    return matchesQuery && matchesStatus && matchesPreference && matchesCompany && matchesLocation && matchesDate
+  }).sort((a, b) => b.applicationDate.localeCompare(a.applicationDate)), [applications, company, dateRange, location, preference, query, status])
+  const hasFilters = query || status !== '全部状态' || preference !== '全部志愿' || company !== '全部公司' || location !== '全部地点' || dateRange !== '全部日期'
 
   useEffect(() => {
     if (searchRequest > 0) document.getElementById('global-application-search')?.focus()
@@ -43,6 +46,7 @@ export function ApplicationsPage({ applications, statuses, searchRequest, onAdd,
   const clearFilters = (): void => {
     setQuery('')
     setStatus('全部状态')
+    setPreference('全部志愿')
     setCompany('全部公司')
     setLocation('全部地点')
     setDateRange('全部日期')
@@ -58,6 +62,7 @@ export function ApplicationsPage({ applications, statuses, searchRequest, onAdd,
           <label className="search-field"><Search size={16} /><input id="global-application-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索公司 / 岗位" /><kbd>Ctrl K</kbd></label>
           <div className="filter-selects">
             <select value={status} onChange={(event) => setStatus(event.target.value)}><option>全部状态</option><option>面试中</option>{statuses.map((item) => <option key={item}>{item}</option>)}</select>
+            <select value={preference} onChange={(event) => setPreference(event.target.value)}><option value="全部志愿">全部志愿</option>{preferences.map((item) => <option value={item} key={item}>第 {item} 志愿</option>)}</select>
             <select value={company} onChange={(event) => setCompany(event.target.value)}><option>全部公司</option>{companies.map((item) => <option key={item}>{item}</option>)}</select>
             <select value={location} onChange={(event) => setLocation(event.target.value)}><option>全部地点</option>{locations.map((item) => <option key={item}>{item}</option>)}</select>
             <select value={dateRange} onChange={(event) => setDateRange(event.target.value)}><option>全部日期</option><option>最近 7 天</option><option>最近 30 天</option></select>
@@ -81,7 +86,7 @@ export function ApplicationsPage({ applications, statuses, searchRequest, onAdd,
                 {filtered.map((application) => (
                   <tr key={application.id} onDoubleClick={() => onOpen(application)}>
                     <td><button className="company-cell" onClick={() => onOpen(application)}><span className="company-avatar">{application.companyName.slice(0, 1)}</span><span><strong>{application.companyName}</strong>{application.isDemo && <small>示例</small>}</span></button></td>
-                    <td><span className="position-cell">{application.positionName}</span></td>
+                    <td><div className="position-with-preference"><span className="position-cell">{application.positionName}</span>{application.preferenceOrder && <small className="preference-badge">第 {application.preferenceOrder} 志愿</small>}</div></td>
                     <td><span className="date-cell">{formatShortDate(application.applicationDate)}</span></td>
                     <td><DeadlineBadge deadline={application.deadline} /></td>
                     <td><StatusTag status={application.status} /></td>

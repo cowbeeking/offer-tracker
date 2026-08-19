@@ -1,5 +1,5 @@
-import { DEFAULT_STATUSES } from '@/types/application'
-import type { AppStateData, Application, BackupData, StatusHistory } from '@/types/application'
+import { DEFAULT_STATUSES, DEFAULT_WORKFLOW_NODES } from '@/types/application'
+import type { AppStateData, Application, ApplicationNodeProgress, BackupData, InterviewReview, KnowledgeNote, StatusHistory, WorkflowNode } from '@/types/application'
 import { createId } from '@/utils/id'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -31,6 +31,67 @@ function optionalTime(value: unknown): string | undefined {
   return text
 }
 
+function optionalPreference(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined
+  const preference = typeof value === 'string' ? Number(value) : value
+  if (typeof preference !== 'number' || !Number.isInteger(preference) || preference < 1) {
+    throw new Error('志愿顺序需要是大于 0 的整数')
+  }
+  return preference
+}
+
+function timestamp(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : Date.now()
+}
+
+function parseReview(value: unknown, applicationIds: Set<string>): InterviewReview {
+  if (!isRecord(value)) throw new Error('面试复盘格式错误')
+  const applicationId = optionalString(value.applicationId)
+  if (typeof value.content !== 'string') throw new Error('面试复盘正文格式错误')
+  return {
+    id: optionalString(value.id) ?? createId(),
+    applicationId: applicationId && applicationIds.has(applicationId) ? applicationId : undefined,
+    workflowNodeId: optionalString(value.workflowNodeId),
+    stageName: optionalString(value.stageName),
+    title: optionalString(value.title) ?? '未命名面试复盘',
+    content: value.content,
+    createdAt: timestamp(value.createdAt),
+    updatedAt: timestamp(value.updatedAt),
+  }
+}
+
+function parseWorkflowNodes(value: unknown, legacyStatuses: string[]): WorkflowNode[] {
+  const rawNodes = Array.isArray(value) ? value : []
+  const source: unknown[] = rawNodes.length
+    ? rawNodes
+    : [...DEFAULT_WORKFLOW_NODES, ...legacyStatuses.map((name) => ({ id: createId(), name, hasReview: false }))]
+  const ids = new Set<string>()
+  const names = new Set<string>()
+  const nodes = source.flatMap((item) => {
+    if (!isRecord(item)) return []
+    const name = optionalString(item.name)
+    if (!name || names.has(name)) return []
+    names.add(name)
+    const requestedId = optionalString(item.id) ?? createId()
+    const id = ids.has(requestedId) ? createId() : requestedId
+    ids.add(id)
+    return [{ id, name, hasReview: item.hasReview === true, isTerminal: item.isTerminal === true }]
+  })
+  return nodes.length ? nodes : DEFAULT_WORKFLOW_NODES
+}
+
+function parseKnowledgeNote(value: unknown): KnowledgeNote {
+  if (!isRecord(value)) throw new Error('知识笔记格式错误')
+  if (typeof value.content !== 'string') throw new Error('知识笔记正文格式错误')
+  return {
+    id: optionalString(value.id) ?? createId(),
+    title: optionalString(value.title) ?? '未命名知识笔记',
+    content: value.content,
+    createdAt: timestamp(value.createdAt),
+    updatedAt: timestamp(value.updatedAt),
+  }
+}
+
 function parseHistory(value: unknown, applicationId: string): StatusHistory {
   if (!isRecord(value)) throw new Error('流程历史格式错误')
   return {
@@ -41,6 +102,21 @@ function parseHistory(value: unknown, applicationId: string): StatusHistory {
     time: optionalTime(value.time),
     note: optionalString(value.note),
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+  }
+}
+
+function parseNodeProgress(value: unknown): ApplicationNodeProgress {
+  if (!isRecord(value)) throw new Error('节点进度格式错误')
+  const scheduledAt = optionalString(value.scheduledAt)
+  if (scheduledAt && !/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(scheduledAt)) throw new Error('节点时间格式错误')
+  const reminder = value.reminderMinutesBefore
+  return {
+    workflowNodeId: requiredString(value.workflowNodeId, 'nodeProgress.workflowNodeId'),
+    scheduledAt,
+    state: value.state === 'completed' ? 'completed' : 'active',
+    reminderMinutesBefore: typeof reminder === 'number' && Number.isInteger(reminder) && reminder >= 0 ? reminder : undefined,
+    reminderSentAt: typeof value.reminderSentAt === 'number' && value.reminderSentAt > 0 ? value.reminderSentAt : undefined,
+    updatedAt: timestamp(value.updatedAt),
   }
 }
 
@@ -66,6 +142,7 @@ function parseApplication(value: unknown): Application {
     id,
     companyName: requiredString(value.companyName, 'companyName'),
     positionName: requiredString(value.positionName, 'positionName'),
+    preferenceOrder: optionalPreference(value.preferenceOrder),
     applicationDate,
     deadline: value.deadline ? dateString(value.deadline, 'deadline') : undefined,
     status,
@@ -76,6 +153,7 @@ function parseApplication(value: unknown): Application {
     salary: optionalString(value.salary),
     notes: optionalString(value.notes),
     histories,
+    nodeProgress: Array.isArray(value.nodeProgress) ? value.nodeProgress.map(parseNodeProgress) : [],
     isDemo: false,
     createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
     updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
@@ -128,10 +206,36 @@ export function parseBackup(raw: string): AppStateData {
     seenIds.add(id)
     return { ...application, id, histories: application.histories.map((history) => ({ ...history, applicationId: id })) }
   })
+  const applicationIds = new Set(applications.map(({ id }) => id))
+  const workflowNodes = parseWorkflowNodes(data.workflowNodes, customStatuses)
+  const workflowNames = new Set(workflowNodes.map((node) => node.name))
+  discoveredStatuses.forEach((name) => {
+    if (!workflowNames.has(name)) workflowNodes.push({ id: createId(), name, hasReview: false })
+  })
+  const workflowNodeIds = new Set(workflowNodes.map((node) => node.id))
+  const reviewIds = new Set<string>()
+  const linkedNodeKeys = new Set<string>()
+  const reviews = (Array.isArray(data.reviews) ? data.reviews : []).map((value) => parseReview(value, applicationIds)).map((review) => {
+    const id = reviewIds.has(review.id) ? createId() : review.id
+    reviewIds.add(id)
+    const workflowNodeId = review.workflowNodeId && workflowNodeIds.has(review.workflowNodeId) ? review.workflowNodeId : undefined
+    const key = review.applicationId && workflowNodeId ? `${review.applicationId}:${workflowNodeId}` : undefined
+    if (key && linkedNodeKeys.has(key)) return { ...review, id, workflowNodeId: undefined, stageName: undefined }
+    if (key) linkedNodeKeys.add(key)
+    return { ...review, id, workflowNodeId }
+  })
+  const knowledgeNoteIds = new Set<string>()
+  const knowledgeNotes = (Array.isArray(data.knowledgeNotes) ? data.knowledgeNotes : []).map(parseKnowledgeNote).map((note) => {
+    const id = knowledgeNoteIds.has(note.id) ? createId() : note.id
+    knowledgeNoteIds.add(id)
+    return { ...note, id }
+  })
   return {
     version: 1,
     applications,
-    customStatuses: [...customStatuses, ...new Set(discoveredStatuses)],
+    reviews,
+    knowledgeNotes,
+    workflowNodes,
     theme: data.theme === 'light' || data.theme === 'dark' || data.theme === 'system' ? data.theme : 'system',
     initialized: true,
   }
@@ -143,10 +247,11 @@ function csvCell(value: string | number | undefined): string {
 }
 
 export function applicationsToCsv(applications: Application[]): string {
-  const header = ['公司', '岗位', '投递日期', '截止日期', '当前进度', '地点', '渠道', '岗位类型', '薪资', '链接', '备注']
+  const header = ['公司', '岗位', '志愿顺序', '投递日期', '截止日期', '当前进度', '地点', '渠道', '岗位类型', '薪资', '链接', '备注']
   const rows = applications.map((item) => [
     item.companyName,
     item.positionName,
+    item.preferenceOrder ? `第${item.preferenceOrder}志愿` : undefined,
     item.applicationDate,
     item.deadline,
     item.status,
