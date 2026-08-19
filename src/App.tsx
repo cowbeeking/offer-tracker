@@ -341,7 +341,7 @@ export function App(): JSX.Element {
         <div className={`page-container ${page === 'settings' ? 'settings-container' : ''}`}>
           {page === 'dashboard' && <DashboardPage applications={state.applications} statuses={statuses} workflowNodes={state.workflowNodes} onNavigate={navigateTo} onOpen={(item) => setDetailId(item.id)} />}
           {page === 'applications' && <ApplicationsPage applications={state.applications} statuses={statuses} searchRequest={searchRequest} onAdd={openCreate} onOpen={(item) => setDetailId(item.id)} onEdit={openEdit} onDelete={setDeleting} />}
-          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} onOpen={(item) => setDetailId(item.id)} onStatusChange={moveBoardCard} onInvalidMove={(message) => notify(message, 'error')} />}
+          {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} workflowNodes={state.workflowNodes} onOpen={(item) => setDetailId(item.id)} onStatusChange={moveBoardCard} onInvalidMove={(message) => notify(message, 'error')} />}
           {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} workflowNodes={state.workflowNodes} openRequest={reviewOpenRequest} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
           {page === 'knowledge' && <KnowledgeNotesPage notes={state.knowledgeNotes} onAdd={addKnowledgeNote} onUpdate={updateKnowledgeNote} onDelete={deleteKnowledgeNote} onNotify={notify} />}
           {page === 'statistics' && <StatisticsPage applications={state.applications} />}

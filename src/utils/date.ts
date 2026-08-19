@@ -13,6 +13,12 @@ export function formatShortDate(value?: string): string {
   return `${month}-${day}`
 }
 
+export function formatShortDateTime(value?: string): string {
+  if (!value) return '—'
+  const [date, time] = value.split('T')
+  return `${formatShortDate(date)}${time ? ` ${time.slice(0, 5)}` : ''}`
+}
+
 export function formatChineseDate(value?: string): string {
   if (!value) return '未设置'
   const date = parseLocalDate(value)

@@ -9,3 +9,15 @@ export function findPreviousWorkflowNode(application: Application, workflowNodes
   }
   return undefined
 }
+
+export function getCurrentNodeDateTime(application: Application, workflowNodes: WorkflowNode[]): string {
+  const currentNode = workflowNodes.find((node) => node.name === application.status)
+  const currentProgress = currentNode
+    ? application.nodeProgress.find((progress) => progress.workflowNodeId === currentNode.id)
+    : undefined
+  if (currentProgress?.scheduledAt) return currentProgress.scheduledAt
+
+  const currentHistory = [...application.histories].reverse().find((history) => history.status === application.status)
+  if (currentHistory) return `${currentHistory.date}${currentHistory.time ? `T${currentHistory.time}` : ''}`
+  return application.applicationDate
+}

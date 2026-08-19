@@ -4,12 +4,14 @@ import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
-import type { Application } from '@/types/application'
-import { formatShortDate } from '@/utils/date'
+import type { Application, WorkflowNode } from '@/types/application'
+import { formatShortDateTime } from '@/utils/date'
+import { getCurrentNodeDateTime } from '@/utils/workflow'
 
 interface BoardPageProps {
   applications: Application[]
   statuses: string[]
+  workflowNodes: WorkflowNode[]
   onOpen: (application: Application) => void
   onStatusChange: (id: string, status: string, event: { date: string; time: string; note?: string }) => void
   onInvalidMove: (message: string) => void
@@ -21,7 +23,7 @@ function currentLocalDateTime(): string {
   return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
-export function BoardPage({ applications, statuses, onOpen, onStatusChange, onInvalidMove }: BoardPageProps): JSX.Element {
+export function BoardPage({ applications, statuses, workflowNodes, onOpen, onStatusChange, onInvalidMove }: BoardPageProps): JSX.Element {
   const [query, setQuery] = useState('')
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [overStatus, setOverStatus] = useState<string | null>(null)
@@ -167,7 +169,7 @@ export function BoardPage({ applications, statuses, onOpen, onStatusChange, onIn
             {boardStatuses.map((status) => {
               const items = visible
                 .filter((application) => application.status === status)
-                .sort((first, second) => first.applicationDate.localeCompare(second.applicationDate) || first.createdAt - second.createdAt)
+                .sort((first, second) => getCurrentNodeDateTime(first, workflowNodes).localeCompare(getCurrentNodeDateTime(second, workflowNodes)) || first.createdAt - second.createdAt)
               const draggedApplication = applications.find((application) => application.id === draggedId)
               const isEarlierTarget = Boolean(draggedApplication && statuses.indexOf(status) < statuses.indexOf(draggedApplication.status))
               return (
@@ -195,7 +197,7 @@ export function BoardPage({ applications, statuses, onOpen, onStatusChange, onIn
                           {application.preferenceOrder && <span className="preference-badge">第 {application.preferenceOrder} 志愿</span>}
                         </button>
                         <div className="card-meta">
-                          <span><CalendarDays size={13} />{formatShortDate(application.applicationDate)}</span>
+                          <span title="当前节点时间"><CalendarDays size={13} />{formatShortDateTime(getCurrentNodeDateTime(application, workflowNodes))}</span>
                           {application.location && <span><MapPin size={13} />{application.location}</span>}
                           <div className="card-actions">
                             <GripVertical size={15} className="drag-handle" />
