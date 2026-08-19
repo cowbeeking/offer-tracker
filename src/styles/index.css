@@ -279,11 +279,7 @@
   }
 
   .brand-mark {
-    @apply grid size-8 flex-none place-items-center rounded-lg bg-accent text-sm font-semibold text-white shadow-sm;
-  }
-
-  .dark .brand-mark {
-    @apply text-[#18201c];
+    @apply size-8 flex-none drop-shadow-sm;
   }
 
   .brand div {

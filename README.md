@@ -1,3 +1,5 @@
+<p align="center"><img src="./public/logo.svg" width="88" height="88" alt="秋招 Tracker Logo" /></p>
+
 # 秋招 Tracker
 
 [![CI](https://github.com/cowbeeking/offer-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/cowbeeking/offer-tracker/actions/workflows/ci.yml)
@@ -20,7 +22,8 @@
 - Light / Dark / System 主题、Windows 开机后台启动与系统托盘驻留；提醒始终以带震动动画和提示音乐的独立桌面右下角弹窗呈现，点击“查看节点”才打开主界面
 - 面试复盘与知识笔记的“全部笔记”侧栏支持向左折叠
 - `Ctrl + N` 新增、`Ctrl + K` 搜索、`Esc` 关闭弹窗
-- 串行自动保存、保存状态提示、失败重试和界面崩溃兜底
+- 防抖合并自动保存、保存状态提示、失败重试和界面崩溃兜底
+- 透明背景纯矢量 Logo；流程上升路径表达从投递到 Offer 的持续推进
 
 ## 本地开发
 
@@ -36,10 +39,11 @@ npm run dev
 ```bash
 npm run lint
 npm run typecheck
+npm run test:coverage
 npm run build
 ```
 
-`npm run build` 会在 `release/` 目录生成 Windows x64 NSIS 安装包。若只想检查桌面应用产物而不生成安装程序，可以运行 `npm run build:app`。
+`npm run test:coverage` 会执行状态流转、撤销、数据关联、备份校验、CSV 安全和 Markdown 工具等回归测试并检查覆盖率阈值。`npm run build` 会在 `release/` 目录生成 Windows x64 NSIS 安装包；若只想检查桌面应用产物而不生成安装程序，可以运行 `npm run build:app`。
 
 ## 数据说明
 

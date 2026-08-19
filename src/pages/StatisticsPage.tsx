@@ -1,9 +1,9 @@
 import { ArrowUpRight, Award, FilePenLine, Gauge, MessagesSquare } from 'lucide-react'
 import { useApplicationMetrics } from '@/hooks/useApplicationMetrics'
-import type { Application } from '@/types/application'
+import type { Application, WorkflowNode } from '@/types/application'
 
-export function StatisticsPage({ applications }: { applications: Application[] }): JSX.Element {
-  const metrics = useApplicationMetrics(applications)
+export function StatisticsPage({ applications, workflowNodes }: { applications: Application[]; workflowNodes: WorkflowNode[] }): JSX.Element {
+  const metrics = useApplicationMetrics(applications, workflowNodes)
   const maxTrend = Math.max(...metrics.trend.map((item) => item.count), 1)
   const activeDays = metrics.trend.filter((item) => item.count > 0).length
 

@@ -2,7 +2,6 @@ import { ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleOff, 
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
-import { INTERVIEW_STATUSES } from '@/constants/statuses'
 import { useApplicationMetrics } from '@/hooks/useApplicationMetrics'
 import type { Application, PageKey, WorkflowNode } from '@/types/application'
 
@@ -16,8 +15,9 @@ interface DashboardPageProps {
 
 export function DashboardPage({ applications, statuses, workflowNodes, onNavigate, onOpen }: DashboardPageProps): JSX.Element {
   const metrics = useApplicationMetrics(applications, workflowNodes)
+  const terminalStatuses = new Set(workflowNodes.filter((node) => node.isTerminal).map((node) => node.name))
   const progress = statuses
-    .filter((status) => !['待投递', '已拒绝', '已结束'].includes(status))
+    .filter((status) => status !== '待投递' && !terminalStatuses.has(status))
     .map((status) => ({ status, count: applications.filter((item) => item.status === status).length }))
     .filter((item) => item.count > 0)
   const maxProgress = Math.max(...progress.map((item) => item.count), 1)
@@ -26,7 +26,7 @@ export function DashboardPage({ applications, statuses, workflowNodes, onNavigat
     <div className="page dashboard-page">
       <header className="page-heading dashboard-heading">
         <div>
-          <span className="eyebrow">2026 Autumn Recruitment</span>
+          <span className="eyebrow">{new Date().getFullYear()} Autumn Recruitment</span>
           <h1>秋招进度</h1>
           <p>把每一次投递变成清晰、可推进的下一步。</p>
         </div>
@@ -35,7 +35,7 @@ export function DashboardPage({ applications, statuses, workflowNodes, onNavigat
 
       <section className="metric-grid">
         <article className="metric-card"><span className="metric-icon blue"><BriefcaseBusiness size={18} /></span><div><span>总投递</span><strong>{metrics.total}</strong><small>全部岗位记录</small></div></article>
-        <article className="metric-card"><span className="metric-icon orange"><CalendarClock size={18} /></span><div><span>面试中</span><strong>{metrics.interviews}</strong><small>{INTERVIEW_STATUSES.join(' · ')}</small></div></article>
+        <article className="metric-card"><span className="metric-icon orange"><CalendarClock size={18} /></span><div><span>面试中</span><strong>{metrics.interviews}</strong><small>{metrics.interviewStatusNames.join(' · ') || '暂无面试节点'}</small></div></article>
         <article className="metric-card"><span className="metric-icon green"><CheckCircle2 size={18} /></span><div><span>Offer</span><strong>{metrics.offers}</strong><small>Offer 率 {metrics.offerRate.toFixed(1)}%</small></div></article>
         <article className="metric-card"><span className="metric-icon slate"><CircleOff size={18} /></span><div><span>已结束</span><strong>{metrics.closed}</strong><small>拒绝或流程结束</small></div></article>
       </section>

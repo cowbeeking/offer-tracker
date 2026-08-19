@@ -184,7 +184,7 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
           <span>招聘链接</span>
           <input value={draft.link} onChange={(event) => setField('link', event.target.value)} placeholder="https://..." />
         </label>
-        <div className="field-group field-span-2">
+        {!application && <div className="field-group field-span-2">
           <span className="field-group-title">当前阶段事件（用于今日待办）</span>
           <div className="event-fields">
             <label className="field">
@@ -196,7 +196,7 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
               <input type="time" value={draft.eventTime} onChange={(event) => setField('eventTime', event.target.value)} />
             </label>
           </div>
-        </div>
+        </div>}
         <label className="field field-span-2">
           <span>备注</span>
           <textarea value={draft.notes} onChange={(event) => setField('notes', event.target.value)} rows={4} placeholder="记录准备事项、联系人、面试反馈等" />

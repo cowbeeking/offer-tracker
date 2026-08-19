@@ -5,7 +5,7 @@ import { StatusTag } from '@/components/StatusTag'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import type { Application, WorkflowNode } from '@/types/application'
-import { formatShortDateTime } from '@/utils/date'
+import { formatShortDateTime, isValidLocalDateTime, toLocalDateTimeInput } from '@/utils/date'
 import { getCurrentNodeDateTime } from '@/utils/workflow'
 
 interface BoardPageProps {
@@ -15,12 +15,6 @@ interface BoardPageProps {
   onOpen: (application: Application) => void
   onStatusChange: (id: string, status: string, event: { date: string; time: string; note?: string }) => void
   onInvalidMove: (message: string) => void
-}
-
-function currentLocalDateTime(): string {
-  const now = new Date()
-  const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  return `${date}T${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
 }
 
 export function BoardPage({ applications, statuses, workflowNodes, onOpen, onStatusChange, onInvalidMove }: BoardPageProps): JSX.Element {
@@ -103,10 +97,14 @@ export function BoardPage({ applications, statuses, workflowNodes, onOpen, onSta
     if (application && application.status !== status) {
       const currentIndex = statuses.indexOf(application.status)
       const targetIndex = statuses.indexOf(status)
+      const targetNode = workflowNodes.find((node) => node.name === status)
+      const alreadyExperienced = Boolean(targetNode && application.nodeProgress.some((progress) => progress.workflowNodeId === targetNode.id))
       if (currentIndex >= 0 && targetIndex >= 0 && targetIndex < currentIndex) {
         onInvalidMove('招聘流程不能向前拖动；如需回退，请使用卡片上的“撤销”')
+      } else if (alreadyExperienced) {
+        onInvalidMove('这个节点已经经历过，不能重复进入；如需回退，请在招聘流程中撤销')
       } else {
-        setPendingDrop({ application, status, scheduledAt: currentLocalDateTime(), note: '' })
+        setPendingDrop({ application, status, scheduledAt: toLocalDateTimeInput(), note: '' })
       }
     }
     stopDragAutoScroll()
@@ -117,6 +115,10 @@ export function BoardPage({ applications, statuses, workflowNodes, onOpen, onSta
   const confirmDrop = (event: FormEvent): void => {
     event.preventDefault()
     if (!pendingDrop?.scheduledAt) return
+    if (!isValidLocalDateTime(pendingDrop.scheduledAt) || pendingDrop.scheduledAt.slice(0, 10) < pendingDrop.application.applicationDate) {
+      onInvalidMove('节点时间不能早于投递日期')
+      return
+    }
     onStatusChange(pendingDrop.application.id, pendingDrop.status, {
       date: pendingDrop.scheduledAt.slice(0, 10),
       time: pendingDrop.scheduledAt.slice(11, 16),
@@ -171,7 +173,8 @@ export function BoardPage({ applications, statuses, workflowNodes, onOpen, onSta
                 .filter((application) => application.status === status)
                 .sort((first, second) => getCurrentNodeDateTime(first, workflowNodes).localeCompare(getCurrentNodeDateTime(second, workflowNodes)) || first.createdAt - second.createdAt)
               const draggedApplication = applications.find((application) => application.id === draggedId)
-              const isEarlierTarget = Boolean(draggedApplication && statuses.indexOf(status) < statuses.indexOf(draggedApplication.status))
+              const targetNode = workflowNodes.find((node) => node.name === status)
+              const isEarlierTarget = Boolean(draggedApplication && status !== draggedApplication.status && (statuses.indexOf(status) < statuses.indexOf(draggedApplication.status) || (targetNode && draggedApplication.nodeProgress.some((progress) => progress.workflowNodeId === targetNode.id))))
               return (
                 <section
                   className={`kanban-column ${overStatus === status ? isEarlierTarget ? 'drag-blocked' : 'drag-over' : ''}`}
@@ -215,7 +218,7 @@ export function BoardPage({ applications, statuses, workflowNodes, onOpen, onSta
       ) : <section className="panel"><EmptyState title="看板还是空的" description="请先在投递记录中添加机会，再到这里推进招聘阶段。" /></section>}
       <Modal open={Boolean(pendingDrop)} width="sm" title={`进入「${pendingDrop?.status ?? ''}」`} description={pendingDrop ? `${pendingDrop.application.companyName} · ${pendingDrop.application.positionName}` : ''} onClose={() => setPendingDrop(undefined)}>
         <form className="board-drop-form" onSubmit={confirmDrop}>
-          <label className="field"><span>节点日期与时间 <em>*</em></span><input autoFocus required type="datetime-local" step="60" value={pendingDrop?.scheduledAt ?? ''} onChange={(event) => setPendingDrop((current) => current ? { ...current, scheduledAt: event.target.value } : current)} /></label>
+          <label className="field"><span>节点日期与时间 <em>*</em></span><input autoFocus required type="datetime-local" step="60" min={pendingDrop ? `${pendingDrop.application.applicationDate}T00:00` : undefined} value={pendingDrop?.scheduledAt ?? ''} onChange={(event) => setPendingDrop((current) => current ? { ...current, scheduledAt: event.target.value } : current)} /></label>
           <label className="field"><span>节点备注</span><input value={pendingDrop?.note ?? ''} onChange={(event) => setPendingDrop((current) => current ? { ...current, note: event.target.value } : current)} placeholder="例如：收到一面通知" /></label>
           <footer className="modal-footer"><Button type="button" onClick={() => setPendingDrop(undefined)}>取消</Button><Button type="submit" variant="primary">确认更新</Button></footer>
         </form>

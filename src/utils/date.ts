@@ -7,6 +7,18 @@ export function toDateInput(date = new Date()): string {
   return `${year}-${month}-${day}`
 }
 
+export function toLocalDateTimeInput(date = new Date()): string {
+  return `${toDateInput(date)}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+export function isValidLocalDateTime(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)
+  if (!match) return false
+  const [, year, month, day, hour, minute] = match.map(Number)
+  const date = new Date(year, month - 1, day, hour, minute)
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day && date.getHours() === hour && date.getMinutes() === minute
+}
+
 export function formatShortDate(value?: string): string {
   if (!value) return '—'
   const [, month, day] = value.split('-')

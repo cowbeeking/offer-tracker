@@ -1,18 +1,23 @@
 import { useMemo } from 'react'
-import { CLOSED_STATUSES, INTERVIEW_STATUSES } from '@/constants/statuses'
+import { INTERVIEW_STATUSES } from '@/constants/statuses'
 import type { Application, WorkflowNode } from '@/types/application'
 import { daysUntil, lastNDays, toDateInput } from '@/utils/date'
 
 export function useApplicationMetrics(applications: Application[], workflowNodes: WorkflowNode[] = []) {
   return useMemo(() => {
     const total = applications.length
-    const interviews = applications.filter((item) => INTERVIEW_STATUSES.includes(item.status)).length
+    const terminalStatuses = new Set(workflowNodes.filter((node) => node.isTerminal).map((node) => node.name))
+    const configuredReviewStatuses = workflowNodes.filter((node) => node.hasReview).map((node) => node.name)
+    const writtenStatuses = new Set(['笔试', ...configuredReviewStatuses.filter((status) => /(笔试|测评|机试)/.test(status))])
+    const interviewStatusNames = configuredReviewStatuses.filter((status) => !writtenStatuses.has(status))
+    const effectiveInterviewStatuses = interviewStatusNames.length ? interviewStatusNames : [...INTERVIEW_STATUSES]
+    const interviews = applications.filter((item) => effectiveInterviewStatuses.includes(item.status)).length
     const offers = applications.filter((item) => item.status === 'Offer').length
-    const closed = applications.filter((item) => ['已拒绝', '已结束'].includes(item.status)).length
-    const reachedWritten = applications.filter((item) => item.histories.some((history) => history.status === '笔试')).length
-    const reachedInterview = applications.filter((item) => item.histories.some((history) => INTERVIEW_STATUSES.includes(history.status))).length
+    const closed = applications.filter((item) => terminalStatuses.has(item.status)).length
+    const reachedWritten = applications.filter((item) => item.histories.some((history) => writtenStatuses.has(history.status))).length
+    const reachedInterview = applications.filter((item) => item.histories.some((history) => effectiveInterviewStatuses.includes(history.status))).length
     const upcomingDeadlines = applications
-      .filter((item) => !CLOSED_STATUSES.includes(item.status))
+      .filter((item) => !terminalStatuses.has(item.status) && item.status !== 'Offer')
       .map((item) => ({ application: item, days: daysUntil(item.deadline) }))
       .filter((item): item is { application: Application; days: number } => item.days !== null && item.days >= 0 && item.days <= 3)
       .sort((a, b) => a.days - b.days)
@@ -34,6 +39,7 @@ export function useApplicationMetrics(applications: Application[], workflowNodes
     return {
       total,
       interviews,
+      interviewStatusNames: effectiveInterviewStatuses,
       offers,
       closed,
       reachedWritten,
