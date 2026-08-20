@@ -1958,7 +1958,7 @@
 
   .markdown-color-popover {
     @apply absolute left-0 top-9 z-20 w-[184px] rounded-xl border border-line bg-panel p-3 shadow-2xl;
-    animation: toast-in 140ms ease-out;
+    animation: markdown-popover-in 120ms ease-out;
   }
 
   .markdown-color-popover > strong {
@@ -1987,7 +1987,7 @@
 
   .markdown-table-popover {
     @apply absolute right-0 top-9 z-20 grid w-[190px] grid-cols-2 gap-2 rounded-xl border border-line bg-panel p-3 text-[9px] text-muted shadow-2xl;
-    animation: toast-in 140ms ease-out;
+    animation: markdown-popover-in 120ms ease-out;
   }
 
   .markdown-table-popover > strong {
@@ -2042,6 +2042,12 @@
     min-height: 48px;
     border: 2px solid transparent;
     background-clip: padding-box;
+    cursor: default;
+  }
+
+  .review-document > textarea::-webkit-scrollbar,
+  .review-document > textarea::-webkit-scrollbar-track {
+    cursor: default;
   }
 
   .review-document.mode-source > textarea {
@@ -2214,6 +2220,14 @@
     @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent;
   }
 
+  .review-document.mode-preview .markdown-prose :is(h1, h2, h3, h4, h5, h6, pre, code) {
+    cursor: not-allowed;
+  }
+
+  .review-document.mode-preview .markdown-prose a {
+    cursor: pointer;
+  }
+
   .markdown-prose .katex-display {
     @apply my-5 overflow-x-auto py-1 text-center;
   }
@@ -2260,6 +2274,10 @@
     content: '点击输入内容';
   }
 
+  .markdown-live-append {
+    @apply mt-1 flex min-h-8 cursor-text items-center rounded-md px-2 py-1 text-[11px] text-muted/50 transition hover:bg-ink/[0.025] hover:text-muted;
+  }
+
   .markdown-live-textarea {
     @apply block w-full resize-none overflow-hidden rounded-md border border-accent/25 bg-accent/[0.035] px-3 py-2 font-mono text-[12px] leading-6 text-ink outline-none ring-2 ring-accent/10;
     min-height: 48px;
@@ -2301,6 +2319,11 @@
 @keyframes toast-in {
   from { opacity: 0; transform: translate(-50%, 8px); }
   to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@keyframes markdown-popover-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes reminder-in {

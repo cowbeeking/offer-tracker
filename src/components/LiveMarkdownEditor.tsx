@@ -205,16 +205,26 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
 
   const updateBlock = (block: MarkdownBlock, event: ChangeEvent<HTMLTextAreaElement>): void => {
     const replacement = event.target.value
-    const nextSource = `${source.slice(0, block.start)}${replacement}${source.slice(block.end)}`
-    const absoluteStart = block.start + event.target.selectionStart
-    const absoluteEnd = block.start + event.target.selectionEnd
+    const appending = block.start === source.length && block.end === source.length && !block.text
+    const separator = appending && replacement && source
+      ? (source.endsWith('\n\n') ? '' : source.endsWith('\n') ? '\n' : '\n\n')
+      : ''
+    const editStart = block.start + separator.length
+    const nextSource = `${source.slice(0, block.start)}${separator}${replacement}${source.slice(block.end)}`
+    const absoluteStart = editStart + event.target.selectionStart
+    const absoluteEnd = editStart + event.target.selectionEnd
     pendingSelectionRef.current = {
-      start: Math.max(0, absoluteStart - block.start),
-      end: Math.max(0, absoluteEnd - block.start),
+      start: Math.max(0, absoluteStart - editStart),
+      end: Math.max(0, absoluteEnd - editStart),
     }
     setSource(nextSource)
-    setActiveRange({ start: block.start, end: block.start + replacement.length })
+    setActiveRange({ start: editStart, end: editStart + replacement.length })
     onChange(nextSource, 'typing')
+  }
+
+  const appendBlock = (): void => {
+    pendingSelectionRef.current = { start: 0, end: 0 }
+    setActiveRange({ start: source.length, end: source.length })
   }
 
   const applyAction = (action: MarkdownAction): void => {
@@ -261,8 +271,8 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
   }
 
   return (
-    <div className="markdown-live-editor" onClick={(event) => { if (event.target === event.currentTarget && blocks.length) activate(blocks[blocks.length - 1]) }}>
-      {blocks.map((block, index) => {
+    <div className="markdown-live-editor" onClick={(event) => { if (event.target === event.currentTarget) appendBlock() }}>
+      {(source.trim() || activeRange) && blocks.map((block, index) => {
         const active = Boolean(block.active)
         return (
           <div className={`markdown-live-block ${active ? 'active' : ''}`} key={`block-${index}`}>
@@ -288,6 +298,13 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
           </div>
         )
       })}
+      {(!activeRange || activeRange.end !== source.length) && <div
+        className="markdown-live-append"
+        role="button"
+        tabIndex={0}
+        onClick={(event) => { event.stopPropagation(); appendBlock() }}
+        onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') appendBlock() }}
+      >点击输入内容</div>}
     </div>
   )
 })
