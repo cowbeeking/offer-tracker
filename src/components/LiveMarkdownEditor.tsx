@@ -188,9 +188,16 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
   const updateBlock = (block: MarkdownBlock, event: ChangeEvent<HTMLTextAreaElement>): void => {
     const replacement = event.target.value
     const nextSource = `${source.slice(0, block.start)}${replacement}${source.slice(block.end)}`
-    pendingSelectionRef.current = { start: event.target.selectionStart, end: event.target.selectionEnd }
+    const absoluteStart = block.start + event.target.selectionStart
+    const absoluteEnd = block.start + event.target.selectionEnd
+    const nextBlocks = parseMarkdownBlocks(nextSource)
+    const nextActive = nextBlocks.find((item) => absoluteStart >= item.start && absoluteStart <= item.end) ?? nextBlocks[nextBlocks.length - 1]
+    pendingSelectionRef.current = {
+      start: Math.max(0, absoluteStart - nextActive.start),
+      end: Math.max(0, absoluteEnd - nextActive.start),
+    }
     setSource(nextSource)
-    setActiveRange({ start: block.start, end: block.start + replacement.length })
+    setActiveRange({ start: nextActive.start, end: nextActive.end })
     onChange(nextSource)
   }
 

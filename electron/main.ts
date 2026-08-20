@@ -8,7 +8,9 @@ let tray: Tray | null = null
 let quitting = false
 let backgroundHintShown = false
 const startHidden = process.argv.includes('--hidden')
+const appIconPath = join(__dirname, '../../build/icon.png')
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+app.setAppUserModelId('com.autumn.tracker')
 
 interface ReminderPayload {
   applicationId?: string
@@ -48,6 +50,7 @@ function createWindow(showWhenReady = !startHidden): void {
     backgroundColor: '#f6f6f3',
     autoHideMenuBar: true,
     title: '秋招 Tracker',
+    icon: appIconPath,
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/preload.js'),
@@ -191,8 +194,7 @@ function showReminderPopup(payload: ReminderPayload): void {
 
 async function createTray(): Promise<void> {
   if (tray) return
-  const icon = await app.getFileIcon(process.execPath, { size: 'small' })
-  tray = new Tray(icon)
+  tray = new Tray(appIconPath)
   tray.setToolTip('秋招 Tracker · 后台提醒运行中')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开主界面', click: showMainWindow },

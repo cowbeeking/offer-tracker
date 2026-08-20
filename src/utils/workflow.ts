@@ -1,13 +1,16 @@
 import type { Application, WorkflowNode } from '@/types/application'
 
 export function findPreviousWorkflowNode(application: Application, workflowNodes: WorkflowNode[]): WorkflowNode | undefined {
-  const currentIndex = workflowNodes.findIndex((node) => node.name === application.status)
-  if (currentIndex <= 0) return undefined
   const experiencedNodeIds = new Set(application.nodeProgress.map((progress) => progress.workflowNodeId))
-  for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    if (experiencedNodeIds.has(workflowNodes[index].id)) return workflowNodes[index]
+  const currentHistoryIndex = application.histories.map((history) => history.status).lastIndexOf(application.status)
+  for (let index = currentHistoryIndex - 1; index >= 0; index -= 1) {
+    const node = workflowNodes.find((item) => item.name === application.histories[index].status)
+    if (node && experiencedNodeIds.has(node.id)) return node
   }
-  return undefined
+  return application.nodeProgress
+    .filter((progress) => progress.state === 'completed')
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .flatMap((progress) => workflowNodes.filter((node) => node.id === progress.workflowNodeId && node.name !== application.status))[0]
 }
 
 export function getCurrentNodeDateTime(application: Application, workflowNodes: WorkflowNode[]): string {

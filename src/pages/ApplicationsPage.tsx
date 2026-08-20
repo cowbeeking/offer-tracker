@@ -5,6 +5,7 @@ import { DeadlineBadge } from '@/components/DeadlineBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusTag } from '@/components/StatusTag'
 import type { Application } from '@/types/application'
+import { openExternalUrl } from '@/utils/external'
 import { formatShortDate, isWithinDays } from '@/utils/date'
 
 interface ApplicationsPageProps {
@@ -93,7 +94,7 @@ export function ApplicationsPage({ applications, statuses, searchRequest, onAdd,
                     <td><span className="location-cell">{application.location || '—'}</span></td>
                     <td className="row-actions-cell">
                       <div className="row-actions">
-                        {application.link && <button aria-label="打开招聘链接" title="打开招聘链接" onClick={() => void window.desktopApi?.openExternal(application.link!)}><ExternalLink size={15} /></button>}
+                        {application.link && <button aria-label="打开招聘链接" title="打开招聘链接" onClick={() => void openExternalUrl(application.link!)}><ExternalLink size={15} /></button>}
                         <button aria-label="编辑" title="编辑" onClick={() => onEdit(application)}><Pencil size={15} /></button>
                         <button aria-label="删除" title="删除" onClick={() => onDelete(application)}><Trash2 size={15} /></button>
                       </div>

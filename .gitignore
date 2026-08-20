@@ -3,6 +3,8 @@ out
 release
 release-*
 dist
+coverage
+build/icon.png
 *.tsbuildinfo
 *.log
 .DS_Store

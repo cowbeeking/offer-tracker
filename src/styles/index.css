@@ -279,11 +279,7 @@
   }
 
   .brand-mark {
-    @apply grid size-8 flex-none place-items-center rounded-lg bg-accent text-sm font-semibold text-white shadow-sm;
-  }
-
-  .dark .brand-mark {
-    @apply text-[#18201c];
+    @apply size-8 flex-none drop-shadow-sm;
   }
 
   .brand div {
@@ -1755,11 +1751,11 @@
   }
 
   .review-sidebar-toggle {
-    @apply absolute right-2 top-2 z-10 grid size-7 place-items-center rounded-md border border-line bg-panel text-muted shadow-sm transition hover:border-accent/25 hover:bg-accent/5 hover:text-accent;
+    @apply absolute left-0 top-1/2 z-10 grid h-10 w-5 -translate-y-1/2 place-items-center rounded-r-md border border-l-0 border-line bg-panel text-sm font-semibold text-muted shadow-sm transition hover:border-accent/25 hover:bg-accent/5 hover:text-accent;
   }
 
   .sidebar-collapsed .review-sidebar-toggle {
-    @apply left-1/2 right-auto -translate-x-1/2;
+    @apply left-0;
   }
 
   .sidebar-collapsed .review-sidebar-head,
@@ -1768,7 +1764,7 @@
   }
 
   .review-sidebar-head {
-    @apply flex-none border-b border-line p-3 pr-11;
+    @apply flex-none border-b border-line p-3;
   }
 
   .review-sidebar-head > div {

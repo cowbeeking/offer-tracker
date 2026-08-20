@@ -1,6 +1,7 @@
 import { BarChart3, BookOpenText, Columns3, LayoutDashboard, ListTodo, NotebookTabs, Settings } from 'lucide-react'
 import clsx from 'clsx'
 import type { PageKey, PersistenceStatus } from '@/types/application'
+import { AppLogo } from '@/components/AppLogo'
 
 const NAV_ITEMS: { key: PageKey; label: string; icon: typeof LayoutDashboard }[] = [
   { key: 'dashboard', label: '概览', icon: LayoutDashboard },
@@ -29,7 +30,7 @@ export function Sidebar({ page, persistenceStatus, persistenceError, onNavigate,
   return (
     <aside className="sidebar">
       <div className="brand">
-        <span className="brand-mark">秋</span>
+        <AppLogo className="brand-mark" />
         <div><strong>秋招 Tracker</strong><small>Local workspace</small></div>
       </div>
       <nav className="sidebar-nav" aria-label="主导航">

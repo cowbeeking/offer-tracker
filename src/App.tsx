@@ -3,6 +3,7 @@ import { AlertTriangle, BellRing, Check, Clock3, Plus, RefreshCw, Search, X } fr
 import { ApplicationDetail } from '@/components/ApplicationDetail'
 import { ApplicationModal } from '@/components/ApplicationModal'
 import { Sidebar } from '@/components/Sidebar'
+import { AppLogo } from '@/components/AppLogo'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
 import { useAppStore } from '@/stores/AppStore'
@@ -16,6 +17,7 @@ import { KnowledgeNotesPage } from '@/pages/KnowledgeNotesPage'
 import type { Application, ApplicationDraft, ApplicationNodeProgress, PageKey, WorkflowNode } from '@/types/application'
 import { createInterviewReview } from '@/utils/review'
 import { findPreviousWorkflowNode } from '@/utils/workflow'
+import { toLocalDateTimeInput } from '@/utils/date'
 
 const PAGE_LABELS: Record<PageKey, string> = {
   dashboard: '概览',
@@ -44,11 +46,6 @@ function playReminderSound(): void {
     oscillator.stop(now + index * 0.16 + 0.34)
   })
   window.setTimeout(() => void context.close(), 900)
-}
-
-function localDateTimeValue(date = new Date()): string {
-  const datePart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-  return `${datePart}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 export function App(): JSX.Element {
@@ -90,7 +87,6 @@ export function App(): JSX.Element {
   const [toast, setToast] = useState<{ message: string; tone: 'success' | 'error' }>()
   const [reminderAlert, setReminderAlert] = useState<{ application: Application; node: WorkflowNode; scheduledAt: string }>()
   const presentedReminderKeys = useRef(new Set<string>())
-  const reminderTimers = useRef(new Map<string, number>())
   const detailApplication = state.applications.find((application) => application.id === detailId)
   const companies = useMemo(() => state.applications.map((item) => item.companyName), [state.applications])
 
@@ -132,34 +128,8 @@ export function App(): JSX.Element {
   }, [updateNodeProgress])
 
   const handleNodeProgress = useCallback((applicationId: string, node: WorkflowNode, changes: Partial<Omit<ApplicationNodeProgress, 'workflowNodeId' | 'updatedAt'>>): void => {
-    const application = state.applications.find((item) => item.id === applicationId)
-    const current = application?.nodeProgress.find((progress) => progress.workflowNodeId === node.id)
     updateNodeProgress(applicationId, node, changes)
-    if (!application) return
-    const scheduleChanged = Object.prototype.hasOwnProperty.call(changes, 'scheduledAt') || Object.prototype.hasOwnProperty.call(changes, 'reminderMinutesBefore')
-    const next: ApplicationNodeProgress = {
-      workflowNodeId: node.id,
-      ...current,
-      ...changes,
-      state: changes.state ?? current?.state ?? 'active',
-      reminderSentAt: scheduleChanged ? undefined : changes.reminderSentAt ?? current?.reminderSentAt,
-      updatedAt: Date.now(),
-    }
-    const timerKey = `${applicationId}:${node.id}`
-    const existingTimer = reminderTimers.current.get(timerKey)
-    if (existingTimer !== undefined) window.clearTimeout(existingTimer)
-    reminderTimers.current.delete(timerKey)
-    if (next.state !== 'active' || !next.scheduledAt || next.reminderMinutesBefore === undefined || next.reminderSentAt) return
-    const scheduledTime = new Date(next.scheduledAt).getTime()
-    const now = Date.now()
-    const delay = Math.max(0, scheduledTime - next.reminderMinutesBefore * 60_000 - now)
-    if (now > scheduledTime + 60 * 60_000 || delay > 2_147_000_000) return
-    const timer = window.setTimeout(() => {
-      reminderTimers.current.delete(timerKey)
-      presentReminder(application, node, next)
-    }, delay)
-    reminderTimers.current.set(timerKey, timer)
-  }, [presentReminder, state.applications, updateNodeProgress])
+  }, [updateNodeProgress])
 
   useEffect(() => {
     if (!toast) return
@@ -180,6 +150,16 @@ export function App(): JSX.Element {
   }, [state.theme])
 
   useEffect(() => {
+    const persistedKeys = new Set(state.applications.flatMap((application) => application.nodeProgress.flatMap((progress) =>
+      progress.reminderSentAt && progress.scheduledAt
+        ? [`${application.id}:${progress.workflowNodeId}:${progress.scheduledAt}:${progress.reminderMinutesBefore ?? ''}`]
+        : [])))
+    presentedReminderKeys.current.forEach((key) => {
+      if (!persistedKeys.has(key)) presentedReminderKeys.current.delete(key)
+    })
+  }, [state.applications])
+
+  useEffect(() => {
     const checkReminders = (): void => {
       const now = Date.now()
       const due = state.applications.flatMap((application) => application.nodeProgress.flatMap((progress) => {
@@ -195,7 +175,7 @@ export function App(): JSX.Element {
       presentReminder(due.application, due.node, due.progress)
     }
     checkReminders()
-    const timer = window.setInterval(checkReminders, 30_000)
+    const timer = window.setInterval(checkReminders, 10_000)
     return () => window.clearInterval(timer)
   }, [presentReminder, state.applications, state.workflowNodes])
 
@@ -218,6 +198,7 @@ export function App(): JSX.Element {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
+        if (deleting) return
         setFormOpen(false)
         setDetailId(undefined)
         return
@@ -276,13 +257,7 @@ export function App(): JSX.Element {
       return
     }
     const currentNode = state.workflowNodes.find((node) => node.name === application.status)
-    if (currentNode) {
-      const timerKey = `${application.id}:${currentNode.id}`
-      const timer = reminderTimers.current.get(timerKey)
-      if (timer !== undefined) window.clearTimeout(timer)
-      reminderTimers.current.delete(timerKey)
-      if (reminderAlert?.application.id === application.id && reminderAlert.node.id === currentNode.id) setReminderAlert(undefined)
-    }
+    if (currentNode && reminderAlert?.application.id === application.id && reminderAlert.node.id === currentNode.id) setReminderAlert(undefined)
     undoStatus(application.id)
     notify(`已撤销到「${previousNode.name}」，并清理后一节点的待办与复盘`)
   }
@@ -304,7 +279,7 @@ export function App(): JSX.Element {
       notify('请先添加一条投递记录再试听提醒', 'error')
       return
     }
-    const scheduledAt = localDateTimeValue()
+    const scheduledAt = toLocalDateTimeInput()
     if (window.desktopApi) {
       void window.desktopApi.showReminder({
         applicationId: application.id,
@@ -320,7 +295,7 @@ export function App(): JSX.Element {
   }
 
   if (loading) {
-    return <div className="app-loading"><span className="brand-mark">秋</span><div><strong>秋招 Tracker</strong><small>正在读取本地数据…</small></div></div>
+    return <div className="app-loading"><AppLogo className="brand-mark" /><div><strong>秋招 Tracker</strong><small>正在读取本地数据…</small></div></div>
   }
 
   if (loadError) {
@@ -344,14 +319,14 @@ export function App(): JSX.Element {
           {page === 'board' && <BoardPage applications={state.applications} statuses={statuses} workflowNodes={state.workflowNodes} onOpen={(item) => setDetailId(item.id)} onStatusChange={moveBoardCard} onInvalidMove={(message) => notify(message, 'error')} />}
           {page === 'reviews' && <ReviewsPage applications={state.applications} reviews={state.reviews} workflowNodes={state.workflowNodes} openRequest={reviewOpenRequest} onAdd={addReview} onUpdate={updateReview} onDelete={deleteReview} onNotify={notify} />}
           {page === 'knowledge' && <KnowledgeNotesPage notes={state.knowledgeNotes} onAdd={addKnowledgeNote} onUpdate={updateKnowledgeNote} onDelete={deleteKnowledgeNote} onNotify={notify} />}
-          {page === 'statistics' && <StatisticsPage applications={state.applications} />}
+          {page === 'statistics' && <StatisticsPage applications={state.applications} workflowNodes={state.workflowNodes} />}
           {page === 'settings' && <SettingsPage data={state} onBack={() => navigateTo(lastWorkspacePage)} onReplaceData={replaceData} onClearData={clearData} onRemoveDemo={removeDemoData} onThemeChange={setTheme} onSetWorkflowNodes={setWorkflowNodes} onPreviewReminder={previewReminder} onNotify={notify} />}
         </div>
       </main>
 
       <ApplicationModal open={formOpen} application={editing} statuses={statuses} companies={companies} onSave={saveApplication} onClose={() => { setFormOpen(false); setEditing(undefined) }} />
       <ApplicationDetail application={detailApplication} workflowNodes={state.workflowNodes} reviews={state.reviews} onClose={() => setDetailId(undefined)} onEdit={openEdit} onDelete={setDeleting} onUndo={undoApplicationStatus} onReview={openApplicationReview} onNodeProgress={handleNodeProgress} />
-      <ConfirmDialog open={Boolean(deleting)} title="删除这条投递记录？" description={deleting ? `将永久删除「${deleting.companyName} · ${deleting.positionName}」及全部流程历史，此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
+      <ConfirmDialog open={Boolean(deleting)} title="删除这条投递记录？" description={deleting ? `将永久删除「${deleting.companyName} · ${deleting.positionName}」及全部流程历史；关联复盘会保留为未关联笔记。此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
       {reminderAlert && <div className="node-reminder" role="alertdialog" aria-label="招聘节点提醒">
         <button className="node-reminder-close" aria-label="关闭提醒" onClick={() => setReminderAlert(undefined)}><X size={14} /></button>
         <span className="node-reminder-icon"><BellRing size={21} /></span>

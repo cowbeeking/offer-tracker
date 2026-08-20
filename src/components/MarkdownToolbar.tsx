@@ -80,7 +80,7 @@ export function MarkdownToolbar({ disabled, onAction }: MarkdownToolbarProps): J
           {colorOpen && <div className="markdown-color-popover">
             <strong>字体颜色</strong>
             <div>{TEXT_COLORS.map(([color, label]) => <button key={color} type="button" title={label} aria-label={`设置字体颜色：${label}`} style={{ backgroundColor: color }} onMouseDown={holdSelection} onClick={() => { onAction({ type: 'color', color }); setColorOpen(false) }} />)}</div>
-            <label><span>自定义</span><input type="color" defaultValue="#2563eb" aria-label="自定义字体颜色" onInput={(event) => onAction({ type: 'color', color: event.currentTarget.value })} /></label>
+            <label><span>自定义</span><input type="color" defaultValue="#2563eb" aria-label="自定义字体颜色" onChange={(event) => { onAction({ type: 'color', color: event.currentTarget.value }); setColorOpen(false) }} /></label>
           </div>}
         </div>
       </div>

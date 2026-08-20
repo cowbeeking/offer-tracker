@@ -5,6 +5,7 @@ import { StatusTag } from '@/components/StatusTag'
 import type { Application, ApplicationNodeProgress, InterviewReview, WorkflowNode } from '@/types/application'
 import { formatChineseDate } from '@/utils/date'
 import { findPreviousWorkflowNode } from '@/utils/workflow'
+import { openExternalUrl } from '@/utils/external'
 
 interface ApplicationDetailProps {
   application?: Application
@@ -22,7 +23,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
   const experiencedNodes = useMemo(() => (application?.nodeProgress ?? []).flatMap((progress) => {
     const node = workflowNodes.find((item) => item.id === progress.workflowNodeId)
     return node ? [{ node, progress }] : []
-  }), [application?.nodeProgress, workflowNodes])
+  }).sort((a, b) => workflowNodes.findIndex((node) => node.id === a.node.id) - workflowNodes.findIndex((node) => node.id === b.node.id)), [application?.nodeProgress, workflowNodes])
   const sortedHistories = useMemo(
     () => [...(application?.histories ?? [])].sort((a, b) => b.createdAt - a.createdAt),
     [application?.histories],
@@ -67,7 +68,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
             <div className="section-heading-row">
               <div>
                 <h3>招聘流程</h3>
-                <p className="section-description">节点只读；请在流程看板向后拖动，或在此撤销上一节点</p>
+                <p className="section-description">节点顺序和状态只读；时间可编辑，流程只能从看板推进或在此撤销</p>
               </div>
               <div className="workflow-heading-actions">
                 <StatusTag status={application.status} />
@@ -101,9 +102,9 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
                       >{review ? <BookCheck size={13} /> : <BookOpenText size={13} />}{review ? '已复盘' : '写复盘'}</button>}
                     </div>
                     <div className="node-progress-editor">
-                      <label><span>节点时间</span><input type="datetime-local" step="60" value={progress.scheduledAt ?? ''} onChange={(event) => onNodeProgress(application.id, node, { scheduledAt: event.target.value || undefined })} /></label>
+                      <label><span>节点时间</span><input type="datetime-local" step="60" min={`${application.applicationDate}T00:00`} value={progress.scheduledAt ?? ''} onChange={(event) => onNodeProgress(application.id, node, { scheduledAt: event.target.value || undefined })} /></label>
                       <label><span>状态</span><strong className={`node-state-readonly ${effectiveState}`}>{effectiveState === 'completed' ? '已完成' : '进行中'}</strong></label>
-                      <label className="reminder-field"><span>提前提醒{progress.reminderSentAt ? ' · 已提醒' : ''}</span><span><input type="number" min="0" step="1" value={progress.reminderMinutesBefore ?? ''} onChange={(event) => onNodeProgress(application.id, node, { reminderMinutesBefore: event.target.value === '' ? undefined : Math.max(0, Number(event.target.value)) })} placeholder="不提醒" /><i>分钟</i></span></label>
+                      <label className="reminder-field"><span>提前提醒{progress.reminderSentAt ? ' · 已提醒' : ''}</span><span><input type="number" min="0" max="525600" step="1" disabled={!isCurrent || !progress.scheduledAt} value={isCurrent ? progress.reminderMinutesBefore ?? '' : ''} onChange={(event) => onNodeProgress(application.id, node, { reminderMinutesBefore: event.target.value === '' ? undefined : Math.max(0, Math.min(525600, Math.floor(Number(event.target.value)))) })} placeholder={isCurrent && progress.scheduledAt ? '不提醒' : '仅当前节点'} /><i>分钟</i></span></label>
                     </div>
                   </div>
                 )
@@ -139,7 +140,7 @@ export function ApplicationDetail({ application, workflowNodes, reviews, onClose
                 {application.preferenceOrder && <><dt>志愿</dt><dd>第 {application.preferenceOrder} 志愿</dd></>}
                 {application.salary && <><dt>薪资</dt><dd>{application.salary}</dd></>}
                 {application.jobType && <><dt>类型</dt><dd>{application.jobType}</dd></>}
-                {application.link && <><dt>链接</dt><dd><button onClick={() => void window.desktopApi?.openExternal(application.link!)}>打开招聘页面 <ArrowUpRight size={13} /></button></dd></>}
+                {application.link && <><dt>链接</dt><dd><button onClick={() => void openExternalUrl(application.link!)}>打开招聘页面 <ArrowUpRight size={13} /></button></dd></>}
                 {application.notes && <><dt>备注</dt><dd>{application.notes}</dd></>}
               </dl>
             </section>

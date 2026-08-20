@@ -1,6 +1,7 @@
 import { DEFAULT_STATUSES, DEFAULT_WORKFLOW_NODES } from '@/types/application'
 import type { AppStateData, Application, ApplicationNodeProgress, BackupData, InterviewReview, KnowledgeNote, StatusHistory, WorkflowNode } from '@/types/application'
 import { createId } from '@/utils/id'
+import { isValidLocalDateTime } from '@/utils/date'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -101,21 +102,21 @@ function parseHistory(value: unknown, applicationId: string): StatusHistory {
     date: dateString(value.date, 'history.date'),
     time: optionalTime(value.time),
     note: optionalString(value.note),
-    createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
+    createdAt: timestamp(value.createdAt),
   }
 }
 
 function parseNodeProgress(value: unknown): ApplicationNodeProgress {
   if (!isRecord(value)) throw new Error('节点进度格式错误')
   const scheduledAt = optionalString(value.scheduledAt)
-  if (scheduledAt && !/^\d{4}-\d{2}-\d{2}T([01]\d|2[0-3]):[0-5]\d$/.test(scheduledAt)) throw new Error('节点时间格式错误')
+  if (scheduledAt && !isValidLocalDateTime(scheduledAt)) throw new Error('节点时间格式错误')
   const reminder = value.reminderMinutesBefore
   return {
     workflowNodeId: requiredString(value.workflowNodeId, 'nodeProgress.workflowNodeId'),
     scheduledAt,
     state: value.state === 'completed' ? 'completed' : 'active',
-    reminderMinutesBefore: typeof reminder === 'number' && Number.isInteger(reminder) && reminder >= 0 ? reminder : undefined,
-    reminderSentAt: typeof value.reminderSentAt === 'number' && value.reminderSentAt > 0 ? value.reminderSentAt : undefined,
+    reminderMinutesBefore: typeof reminder === 'number' && Number.isInteger(reminder) && reminder >= 0 && reminder <= 525600 ? reminder : undefined,
+    reminderSentAt: value.reminderSentAt === undefined ? undefined : timestamp(value.reminderSentAt),
     updatedAt: timestamp(value.updatedAt),
   }
 }
@@ -138,13 +139,15 @@ function parseApplication(value: unknown): Application {
         note: '从备份恢复',
         createdAt: Date.now(),
       }]
+  const deadline = value.deadline ? dateString(value.deadline, 'deadline') : undefined
+  if (deadline && deadline < applicationDate) throw new Error('截止日期不能早于投递日期')
   return {
     id,
     companyName: requiredString(value.companyName, 'companyName'),
     positionName: requiredString(value.positionName, 'positionName'),
     preferenceOrder: optionalPreference(value.preferenceOrder),
     applicationDate,
-    deadline: value.deadline ? dateString(value.deadline, 'deadline') : undefined,
+    deadline,
     status,
     location: optionalString(value.location),
     source: optionalString(value.source),
@@ -155,8 +158,8 @@ function parseApplication(value: unknown): Application {
     histories,
     nodeProgress: Array.isArray(value.nodeProgress) ? value.nodeProgress.map(parseNodeProgress) : [],
     isDemo: false,
-    createdAt: typeof value.createdAt === 'number' ? value.createdAt : Date.now(),
-    updatedAt: typeof value.updatedAt === 'number' ? value.updatedAt : Date.now(),
+    createdAt: timestamp(value.createdAt),
+    updatedAt: timestamp(value.updatedAt),
   }
 }
 
@@ -243,7 +246,8 @@ export function parseBackup(raw: string): AppStateData {
 
 function csvCell(value: string | number | undefined): string {
   const text = String(value ?? '')
-  return `"${text.replace(/"/g, '""')}"`
+  const safe = /^[\t\r ]*[=+\-@]/.test(text) ? `'${text}` : text
+  return `"${safe.replace(/"/g, '""')}"`
 }
 
 export function applicationsToCsv(applications: Application[]): string {

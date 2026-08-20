@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['out', 'release', 'node_modules'] },
+  { ignores: ['out', 'release', 'release-*', 'coverage', 'node_modules'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -19,7 +19,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['electron/**/*.ts', '*.config.{js,ts,mjs}'],
+    files: ['electron/**/*.ts', 'scripts/**/*.mjs', '*.config.{js,ts,mjs}'],
     languageOptions: { globals: globals.node },
   },
 )
