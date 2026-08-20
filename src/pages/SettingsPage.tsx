@@ -45,7 +45,32 @@ export function SettingsPage({ data, onBack, onReplaceData, onClearData, onRemov
   const demoCount = data.applications.filter((item) => item.isDemo).length
 
   useEffect(() => {
-    void window.desktopApi?.getAutoLaunch().then(setAutoLaunch).finally(() => setAutoLaunchLoading(false))
+    let active = true
+    const syncAutoLaunch = async (): Promise<void> => {
+      if (!window.desktopApi) {
+        if (active) setAutoLaunchLoading(false)
+        return
+      }
+      setAutoLaunchLoading(true)
+      try {
+        const enabled = await window.desktopApi.getAutoLaunch()
+        if (active) setAutoLaunch(enabled)
+      } finally {
+        if (active) setAutoLaunchLoading(false)
+      }
+    }
+    const syncWhenVisible = (): void => {
+      if (document.visibilityState === 'visible') void syncAutoLaunch()
+    }
+
+    void syncAutoLaunch()
+    window.addEventListener('focus', syncWhenVisible)
+    document.addEventListener('visibilitychange', syncWhenVisible)
+    return () => {
+      active = false
+      window.removeEventListener('focus', syncWhenVisible)
+      document.removeEventListener('visibilitychange', syncWhenVisible)
+    }
   }, [])
 
   useLayoutEffect(() => {

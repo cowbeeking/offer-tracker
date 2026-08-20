@@ -20,6 +20,18 @@ interface ReminderPayload {
   scheduledAt?: string
 }
 
+function getLoginItemOptions(): { path: string; args: string[] } {
+  return {
+    path: process.execPath,
+    args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden'],
+  }
+}
+
+function isAutoLaunchEnabled(): boolean {
+  const settings = app.getLoginItemSettings(getLoginItemOptions())
+  return settings.openAtLogin && (process.platform !== 'win32' || settings.executableWillLaunchAtLogin)
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;',
@@ -271,10 +283,15 @@ app.whenReady().then(() => {
     return true
   })
 
-  ipcMain.handle('app:get-auto-launch', () => app.getLoginItemSettings().openAtLogin)
+  ipcMain.handle('app:get-auto-launch', () => isAutoLaunchEnabled())
   ipcMain.handle('app:set-auto-launch', (_event, enabled: boolean) => {
-    app.setLoginItemSettings({ openAtLogin: Boolean(enabled), args: enabled ? ['--hidden'] : [] })
-    return app.getLoginItemSettings().openAtLogin
+    const openAtLogin = Boolean(enabled)
+    app.setLoginItemSettings({
+      ...getLoginItemOptions(),
+      openAtLogin,
+      enabled: openAtLogin,
+    })
+    return isAutoLaunchEnabled()
   })
   ipcMain.handle('app:show-reminder', (_event, payload?: ReminderPayload) => {
     showReminderPopup(payload ?? {})
