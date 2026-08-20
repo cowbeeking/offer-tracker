@@ -61,4 +61,17 @@ describe('MarkdownContent', () => {
     expect(container.querySelector('math[display="block"]')).not.toBeNull()
     expect(container.querySelector('code[data-language="text"]')?.textContent).toBe('\\[not math\\]')
   })
+
+  it('uses KaTeX HTML layout for formulas with functions, fractions and norms', async () => {
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    roots.push(root)
+    await act(async () => {
+      root.render(<MarkdownContent source={'$$\\cos(a,b)=\\frac{a\\cdot b}{\\lVert a\\rVert\\lVert b\\rVert}$$'} />)
+    })
+
+    expect(container.querySelector('.katex-html')).not.toBeNull()
+    expect(container.querySelector('.katex-html .mop')?.textContent).toBe('cos')
+    expect(container.querySelector('.katex-html')?.textContent).toContain('∥a∥∥b∥')
+  })
 })

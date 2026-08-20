@@ -27,7 +27,7 @@ function escapeHtml(value: string): string {
 
 function printableHtml(title: string, content: string): string {
   const rendered = renderToStaticMarkup(
-    <MarkdownContent source={content} />,
+    <MarkdownContent source={content} mathOutput="mathml" />,
   )
   return `<!doctype html>
 <html lang="zh-CN">

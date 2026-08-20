@@ -165,10 +165,15 @@ function createComponents(): Components {
   }
 }
 
-export const MarkdownContent = memo(function MarkdownContent({ source }: { source: string }): JSX.Element {
+interface MarkdownContentProps {
+  source: string
+  mathOutput?: 'htmlAndMathml' | 'mathml'
+}
+
+export const MarkdownContent = memo(function MarkdownContent({ source, mathOutput = 'htmlAndMathml' }: MarkdownContentProps): JSX.Element {
   return <ReactMarkdown
     remarkPlugins={[remarkGfm, remarkMath]}
-    rehypePlugins={[[rehypeKatex, { output: 'mathml', strict: false }]]}
+    rehypePlugins={[[rehypeKatex, { output: mathOutput, strict: false }]]}
     components={createComponents()}
   >{normalizeMathDelimiters(source)}</ReactMarkdown>
 })
