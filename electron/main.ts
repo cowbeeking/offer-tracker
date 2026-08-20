@@ -28,7 +28,8 @@ function getLoginItemOptions(): { path: string; args: string[] } {
 }
 
 function isAutoLaunchEnabled(): boolean {
-  return app.getLoginItemSettings(getLoginItemOptions()).openAtLogin
+  const settings = app.getLoginItemSettings(getLoginItemOptions())
+  return settings.openAtLogin && (process.platform !== 'win32' || settings.executableWillLaunchAtLogin)
 }
 
 function escapeHtml(value: string): string {
