@@ -74,4 +74,17 @@ describe('MarkdownContent', () => {
     expect(container.querySelector('.katex-html .mop')?.textContent).toBe('cos')
     expect(container.querySelector('.katex-html')?.textContent).toContain('∥a∥∥b∥')
   })
+
+  it('does not let a redundant LaTeX closer swallow the remaining preview', async () => {
+    const container = document.createElement('div')
+    const root = createRoot(container)
+    roots.push(root)
+    await act(async () => {
+      root.render(<MarkdownContent source={'$$\nRRF(d)=\\sum_r\\frac{1}{k+rank_r(d)}\n$$\n\\]\n\n#### 7.6 ANN 与向量索引\n\n后续正文'} />)
+    })
+
+    expect(container.querySelector('.katex-error')).toBeNull()
+    expect(container.querySelector('h4')?.textContent).toBe('7.6 ANN 与向量索引')
+    expect(container.querySelector('h4')?.closest('.katex')).toBeNull()
+  })
 })

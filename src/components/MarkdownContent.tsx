@@ -72,22 +72,58 @@ const LANGUAGE_ALIASES: Record<string, string> = {
 
 const PLAIN_TEXT_LANGUAGES = new Set(['plain', 'plaintext', 'text', 'txt'])
 
+function replaceBalancedMathPairs(source: string, opening: string, closing: string, replacement: string): string {
+  let cursor = 0
+  let output = ''
+  while (cursor < source.length) {
+    const openAt = source.indexOf(opening, cursor)
+    if (openAt === -1) return output + source.slice(cursor)
+    const closeAt = source.indexOf(closing, openAt + opening.length)
+    if (closeAt === -1) return output + source.slice(cursor)
+    output += source.slice(cursor, openAt)
+      + replacement
+      + source.slice(openAt + opening.length, closeAt)
+      + replacement
+    cursor = closeAt + closing.length
+  }
+  return output
+}
+
+function normalizeMathSegment(source: string): string {
+  return replaceBalancedMathPairs(
+    replaceBalancedMathPairs(source, '\\[', '\\]', '$$'),
+    '\\(',
+    '\\)',
+    '$',
+  ).replace(/^\s*\\\]\s*$/gm, '')
+}
+
 function normalizeMathDelimiters(source: string): string {
-  let fence: { marker: string; minimumLength: number } | undefined
-  return source.split('\n').map((line) => {
-    const fenceMatch = /^\s*(`{3,}|~{3,})/.exec(line)?.[1]
-    if (fenceMatch) {
-      if (!fence) fence = { marker: fenceMatch[0], minimumLength: fenceMatch.length }
-      else if (fence.marker === fenceMatch[0] && fenceMatch.length >= fence.minimumLength) fence = undefined
-      return line
+  const lines = source.split('\n')
+  const output: string[] = []
+  let index = 0
+  let outsideStart = 0
+  while (index < lines.length) {
+    const openingFence = /^\s*(`{3,}|~{3,})/.exec(lines[index])?.[1]
+    if (!openingFence) {
+      index += 1
+      continue
     }
-    if (fence) return line
-    return line
-      .replace(/\\\[/g, '$$$$')
-      .replace(/\\\]/g, '$$$$')
-      .replace(/\\\(/g, '$')
-      .replace(/\\\)/g, '$')
-  }).join('\n')
+    if (outsideStart < index) output.push(...normalizeMathSegment(lines.slice(outsideStart, index).join('\n')).split('\n'))
+    const marker = openingFence[0]
+    const minimumLength = openingFence.length
+    let endIndex = index + 1
+    while (endIndex < lines.length) {
+      const closingFence = /^\s*(`+|~+)\s*$/.exec(lines[endIndex])?.[1]
+      endIndex += 1
+      if (closingFence && closingFence[0] === marker && closingFence.length >= minimumLength) break
+    }
+    output.push(...lines.slice(index, endIndex))
+    index = endIndex
+    outsideStart = endIndex
+  }
+  if (outsideStart < lines.length) output.push(...normalizeMathSegment(lines.slice(outsideStart).join('\n')).split('\n'))
+  return output.join('\n')
 }
 
 function nodeText(node: ReactNode): string {

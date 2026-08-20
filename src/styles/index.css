@@ -2224,6 +2224,10 @@
     cursor: not-allowed;
   }
 
+  .review-document.mode-preview .markdown-preview {
+    cursor: not-allowed;
+  }
+
   .review-document.mode-preview .markdown-prose a {
     cursor: pointer;
   }
