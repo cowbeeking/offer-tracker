@@ -7,6 +7,7 @@ import { MarkdownToolbar } from '@/components/MarkdownToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Modal } from '@/components/ui/Modal'
+import { useMarkdownDrafts } from '@/hooks/useMarkdownDrafts'
 import type { Application, InterviewReview, WorkflowNode } from '@/types/application'
 import { createInterviewReview, createReviewTitle } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
@@ -68,6 +69,8 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     })
   }, [applicationById, query, sortedReviews])
   const selected = reviews.find(({ id }) => id === selectedId)
+  const drafts = useMarkdownDrafts(reviews, selectedId, (id, content) => onUpdate(id, { content }))
+  const selectedContent = selected ? drafts.contentFor(selected) : ''
   const selectedApplication = selected?.applicationId ? applicationById.get(selected.applicationId) : undefined
   const selectedReviewNodes = useMemo(() => selectedApplication
     ? getReachedReviewNodes(selectedApplication, workflowNodes)
@@ -85,6 +88,24 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const importNode = importReviewNodes.find((node) => node.id === importWorkflowNodeId)
   const importLinkExists = Boolean(importApplicationId && importWorkflowNodeId && reviewByApplicationNode.get(`${importApplicationId}:${importWorkflowNodeId}`))
 
+  const flushCurrent = (): void => {
+    markdownEditorRef.current?.flush?.()
+    if (selected) drafts.flush(selected.id)
+  }
+  const flushCurrentRef = useRef(flushCurrent)
+  flushCurrentRef.current = flushCurrent
+
+  const selectReview = (id: string): void => {
+    flushCurrent()
+    setSelectedId(id)
+    setMode('live')
+  }
+
+  const changeMode = (nextMode: ReviewMode): void => {
+    flushCurrent()
+    setMode(nextMode)
+  }
+
   useEffect(() => {
     if (selectedId && reviews.some(({ id }) => id === selectedId)) return
     setSelectedId(sortedReviews[0]?.id)
@@ -92,6 +113,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
 
   useEffect(() => {
     if (!openRequest) return
+    flushCurrentRef.current()
     setSelectedId(openRequest.id)
     setMode('live')
   }, [openRequest])
@@ -106,6 +128,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
       return
     }
     const review = createInterviewReview(createApplication, createNode)
+    flushCurrent()
     onAdd(review)
     setSelectedId(review.id)
     setMode('live')
@@ -130,6 +153,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     try {
       const { content } = await readMarkdownFile(file, '未命名面试复盘')
       const review = { ...createInterviewReview(importApplication, importNode), content }
+      flushCurrent()
       onAdd(review)
       setSelectedId(review.id)
       setMode('live')
@@ -156,10 +180,12 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
 
   const exportReview = async (format: 'md' | 'pdf'): Promise<void> => {
     if (!selected) return
+    markdownEditorRef.current?.flush?.()
+    const content = drafts.contentFor(selected)
     try {
       const saved = format === 'md'
-        ? await exportMarkdown(selected.title, selected.content, '未命名面试复盘')
-        : await exportMarkdownPdf(selected.title, selected.content, '未命名面试复盘')
+        ? await exportMarkdown(selected.title, content, '未命名面试复盘')
+        : await exportMarkdownPdf(selected.title, content, '未命名面试复盘')
       if (saved) onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 复盘已导出`)
     } catch {
       onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 导出失败`, 'error')
@@ -198,7 +224,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               const application = review.applicationId ? applicationById.get(review.applicationId) : undefined
               return (
                 <div key={review.id} className={`review-note-card ${selectedId === review.id ? 'active' : ''}`}>
-                  <button className="review-note-select" onClick={() => { setSelectedId(review.id); setMode('live') }}>
+                  <button className="review-note-select" onClick={() => selectReview(review.id)}>
                     <span className="review-note-icon"><FileText size={15} /></span>
                     <span className="review-note-copy">
                       <strong>{review.title.trim() || '未命名面试复盘'}</strong>
@@ -220,9 +246,9 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               <input className="review-title-input" value={selected.title} maxLength={100} onChange={(event) => onUpdate(selected.id, { title: event.target.value })} placeholder="未命名面试复盘" />
               <div className="review-editor-tools">
                 <div className="review-mode-switch" role="group" aria-label="编辑模式">
-                  <button className={mode === 'source' ? 'active' : ''} onClick={() => setMode('source')}><Code2 size={13} />源码</button>
-                  <button className={mode === 'live' ? 'active' : ''} onClick={() => setMode('live')}><Sparkles size={13} />实时预览</button>
-                  <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}><Eye size={13} />预览</button>
+                  <button className={mode === 'source' ? 'active' : ''} onClick={() => changeMode('source')}><Code2 size={13} />源码</button>
+                  <button className={mode === 'live' ? 'active' : ''} onClick={() => changeMode('live')}><Sparkles size={13} />实时预览</button>
+                  <button className={mode === 'preview' ? 'active' : ''} onClick={() => changeMode('preview')}><Eye size={13} />预览</button>
                 </div>
                 <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => void exportReview('md')}>导出 .md</Button>
                 <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => void exportReview('pdf')}>导出 PDF</Button>
@@ -268,13 +294,16 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
                 {selectedReviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}
               </select>
               <i />
-              <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
+              <small>{drafts.isPending(selected.id) ? '等待每分钟自动保存…' : `每 1 分钟自动保存 · 更新于 ${formatUpdatedAt(selected.updatedAt)}`}</small>
             </div>
             <MarkdownToolbar disabled={mode === 'preview'} onAction={(action) => markdownEditorRef.current?.applyAction(action)} />
             <div className={`review-document mode-${mode}`}>
-              {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selected.content} /></article>}
-              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
-              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selectedContent} /></article>}
+              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selectedContent} onChange={(content, kind) => drafts.changeContent(selected, content, kind)} />}
+              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selectedContent} onChange={(documentId, content, kind) => {
+                const document = reviews.find((review) => review.id === documentId)
+                if (document) drafts.changeContent(document, content, kind)
+              }} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>记录一次面试</h2><p>点击右上角新建复盘，使用 Markdown 记录面试过程。</p></div>}
         </div>

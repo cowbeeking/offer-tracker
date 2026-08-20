@@ -1,9 +1,9 @@
 import { forwardRef, useCallback, useImperativeHandle, useRef, type KeyboardEvent } from 'react'
-import { applyMarkdownAction, type MarkdownAction, type MarkdownEditorHandle } from '@/utils/markdownEditing'
+import { applyMarkdownAction, type MarkdownAction, type MarkdownChangeKind, type MarkdownEditorHandle } from '@/utils/markdownEditing'
 
 interface MarkdownSourceEditorProps {
   value: string
-  onChange: (value: string) => void
+  onChange: (value: string, kind?: MarkdownChangeKind) => void
 }
 
 export const MarkdownSourceEditor = forwardRef<MarkdownEditorHandle, MarkdownSourceEditorProps>(function MarkdownSourceEditor({ value, onChange }, ref) {
@@ -14,7 +14,7 @@ export const MarkdownSourceEditor = forwardRef<MarkdownEditorHandle, MarkdownSou
     const start = textarea?.selectionStart ?? value.length
     const end = textarea?.selectionEnd ?? start
     const result = applyMarkdownAction(value, start, end, action)
-    onChange(result.value)
+    onChange(result.value, 'action')
     window.requestAnimationFrame(() => {
       const editor = textareaRef.current
       if (!editor) return
@@ -39,5 +39,5 @@ export const MarkdownSourceEditor = forwardRef<MarkdownEditorHandle, MarkdownSou
     }
   }
 
-  return <textarea ref={textareaRef} value={value} onChange={(event) => onChange(event.target.value)} onKeyDown={handleKeyDown} spellCheck={false} aria-label="Markdown 源码编辑器" />
+  return <textarea ref={textareaRef} value={value} onChange={(event) => onChange(event.target.value, 'typing')} onKeyDown={handleKeyDown} spellCheck={false} aria-label="Markdown 源码编辑器" />
 })

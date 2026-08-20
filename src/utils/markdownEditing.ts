@@ -14,7 +14,10 @@ export interface MarkdownEditResult {
 export interface MarkdownEditorHandle {
   applyAction: (action: MarkdownAction) => void
   focus: () => void
+  flush?: () => void
 }
+
+export type { MarkdownChangeKind } from '@/utils/markdownHistory'
 
 function replaceRange(value: string, start: number, end: number, replacement: string, selectionStart: number, selectionEnd: number): MarkdownEditResult {
   return {
