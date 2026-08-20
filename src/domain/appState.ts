@@ -266,6 +266,7 @@ export function appReducer(state: AppStateData, action: AppAction): AppStateData
       }
     case 'ADD_REVIEW': {
       const normalizedReview = uniqueReviewLinks([action.review], state.applications, state.workflowNodes)[0]
+      if (!normalizedReview.applicationId || !normalizedReview.workflowNodeId) return state
       const linked = normalizedReview.applicationId && normalizedReview.workflowNodeId
       if (linked && state.reviews.some((review) => review.applicationId === normalizedReview.applicationId && review.workflowNodeId === normalizedReview.workflowNodeId)) return state
       return { ...state, reviews: [normalizedReview, ...state.reviews] }

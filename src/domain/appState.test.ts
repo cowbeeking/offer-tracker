@@ -117,6 +117,16 @@ describe('appReducer relationship integrity', () => {
     expect(next.reviews[0]).toMatchObject({ applicationId: 'app-1', workflowNodeId: undefined, stageName: undefined })
   })
 
+  it('does not create a new review without an application and reached node', () => {
+    const current = state()
+    const next = appReducer(current, {
+      type: 'ADD_REVIEW',
+      review: review({ id: 'unlinked', applicationId: undefined, workflowNodeId: undefined, stageName: undefined }),
+    })
+
+    expect(next).toBe(current)
+  })
+
   it('preserves notes but fully unlinks them when an application is deleted', () => {
     const next = appReducer(state(), { type: 'DELETE_APPLICATION', id: 'app-1' })
     expect(next.applications).toHaveLength(0)

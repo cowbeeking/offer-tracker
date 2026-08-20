@@ -29,7 +29,7 @@ export function BoardPage({ applications, statuses, workflowNodes, onOpen, onSta
     const needle = query.trim().toLocaleLowerCase()
     return applications.filter((item) => !needle || `${item.companyName} ${item.positionName} ${item.preferenceOrder ? `第${item.preferenceOrder}志愿` : ''}`.toLocaleLowerCase().includes(needle))
   }, [applications, query])
-  const boardStatuses = statuses.filter((status) => status !== '待投递' || visible.some((item) => item.status === status))
+  const boardStatuses = statuses
 
   const stopDragAutoScroll = (): void => {
     dragAutoScrollVelocityRef.current = 0
