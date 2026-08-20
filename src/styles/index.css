@@ -2220,16 +2220,14 @@
     @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent;
   }
 
-  .review-document.mode-preview .markdown-prose :is(h1, h2, h3, h4, h5, h6, pre, code) {
-    cursor: not-allowed;
+  .review-document.mode-preview .markdown-preview,
+  .review-document.mode-preview .markdown-preview :not(a):not(a *) {
+    cursor: not-allowed !important;
   }
 
-  .review-document.mode-preview .markdown-preview {
-    cursor: not-allowed;
-  }
-
-  .review-document.mode-preview .markdown-prose a {
-    cursor: pointer;
+  .review-document.mode-preview .markdown-preview a,
+  .review-document.mode-preview .markdown-preview a * {
+    cursor: pointer !important;
   }
 
   .markdown-prose .katex-display {
