@@ -1739,7 +1739,6 @@
   .review-workspace {
     @apply grid min-h-0 flex-1 overflow-hidden;
     grid-template-columns: 260px minmax(0, 1fr);
-    transition: grid-template-columns 180ms ease;
   }
 
   .review-workspace.sidebar-collapsed {
@@ -2024,13 +2023,34 @@
     @apply min-h-0 flex-1 overflow-hidden;
   }
 
+  .review-document > textarea::-webkit-scrollbar,
+  .review-document > .markdown-preview::-webkit-scrollbar,
+  .review-document > .markdown-live-editor::-webkit-scrollbar {
+    width: 13px;
+  }
+
+  .review-document > textarea::-webkit-scrollbar-track,
+  .review-document > .markdown-preview::-webkit-scrollbar-track,
+  .review-document > .markdown-live-editor::-webkit-scrollbar-track {
+    @apply bg-canvas/55;
+  }
+
+  .review-document > textarea::-webkit-scrollbar-thumb,
+  .review-document > .markdown-preview::-webkit-scrollbar-thumb,
+  .review-document > .markdown-live-editor::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink/25;
+    min-height: 48px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+
   .review-document.mode-source > textarea {
     @apply h-full w-full resize-none border-0 bg-panel px-8 py-6 font-mono text-[12px] leading-6 text-ink outline-none ring-0;
     tab-size: 2;
   }
 
   .markdown-preview {
-    @apply mx-auto h-full w-full max-w-[860px] overflow-y-auto px-12 py-8 text-[13px] leading-7 text-ink/90;
+    @apply mx-auto h-full w-full max-w-[1120px] overflow-y-auto px-8 py-8 text-[13px] leading-7 text-ink/90;
   }
 
   .markdown-prose > :first-child {
@@ -2194,6 +2214,14 @@
     @apply text-accent underline decoration-accent/30 underline-offset-2 hover:decoration-accent;
   }
 
+  .markdown-prose .katex-display {
+    @apply my-5 overflow-x-auto py-1 text-center;
+  }
+
+  .markdown-prose math[display='block'] {
+    margin-inline: auto;
+  }
+
   .markdown-prose hr {
     @apply my-7 border-0 border-t border-line;
   }
@@ -2212,7 +2240,7 @@
   }
 
   .markdown-live-editor {
-    @apply mx-auto h-full w-full max-w-[860px] overflow-y-auto px-10 py-7 text-[13px] leading-7 text-ink/90;
+    @apply mx-auto h-full w-full max-w-[1120px] overflow-y-auto px-8 py-7 text-[13px] leading-7 text-ink/90;
   }
 
   .markdown-live-block {

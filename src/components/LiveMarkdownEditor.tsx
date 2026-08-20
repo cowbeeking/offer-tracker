@@ -71,6 +71,20 @@ function parseMarkdownBlocks(source: string): MarkdownBlock[] {
       continue
     }
 
+    const displayMathOpening = /^\s*(\$\$|\\\[)\s*$/.exec(line.text)?.[1]
+    if (displayMathOpening) {
+      const closingPattern = displayMathOpening === '$$' ? /^\s*\$\$\s*$/ : /^\s*\\\]\s*$/
+      let endIndex = index + 1
+      while (endIndex < lines.length) {
+        const closed = closingPattern.test(lines[endIndex].text)
+        endIndex += 1
+        if (closed) break
+      }
+      addBlock(index, endIndex)
+      index = endIndex
+      continue
+    }
+
     if (index + 1 < lines.length && line.text.includes('|') && TABLE_DIVIDER_PATTERN.test(lines[index + 1].text)) {
       let endIndex = index + 2
       while (endIndex < lines.length && lines[endIndex].text.trim() && lines[endIndex].text.includes('|')) endIndex += 1

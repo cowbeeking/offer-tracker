@@ -64,6 +64,8 @@ function printableHtml(title: string, content: string): string {
     img { max-width: 100%; }
     hr { margin: 24px 0; border: 0; border-top: 1px solid #dfe3df; }
     input[type="checkbox"] { margin-right: 6px; }
+    .katex-display { margin: 16px 0; overflow: hidden; text-align: center; }
+    math[display="block"] { margin: 0 auto; }
   </style>
 </head>
 <body><article>${rendered}</article></body>
