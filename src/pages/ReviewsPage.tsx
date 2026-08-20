@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { Code2, Download, Eye, FileDown, FileText, Link2, PanelLeftClose, PanelLeftOpen, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react'
+import { Code2, Download, Eye, FileDown, FileText, Link2, Plus, Search, Sparkles, Trash2, Upload } from 'lucide-react'
 import { LiveMarkdownEditor } from '@/components/LiveMarkdownEditor'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
@@ -159,7 +159,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
       <section className={`panel review-workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <aside className="review-notes-sidebar">
           <button className="review-sidebar-toggle" onClick={() => setSidebarCollapsed((value) => !value)} title={sidebarCollapsed ? '展开全部笔记' : '向左折叠全部笔记'} aria-label={sidebarCollapsed ? '展开全部笔记' : '折叠全部笔记'}>
-            {sidebarCollapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+            <span aria-hidden="true">{sidebarCollapsed ? '>' : '<'}</span>
           </button>
           <div className="review-sidebar-head">
             <div><strong>全部笔记</strong><span>{reviews.length}</span></div>

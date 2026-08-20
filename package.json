@@ -7,16 +7,16 @@
   "author": "Autumn Tracker",
   "license": "MIT",
   "scripts": {
-    "dev": "electron-vite dev",
-    "preview": "electron-vite preview",
+    "dev": "npm run icon:render && electron-vite dev",
+    "preview": "npm run icon:render && electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.web.json && tsc --noEmit -p tsconfig.node.json",
     "lint": "eslint . --max-warnings=0",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "icon:render": "electron scripts/render-icon.mjs",
+    "icon:render": "node scripts/render-icon.mjs",
     "build:app": "electron-vite build",
-    "build:dir": "npm run typecheck && electron-vite build && electron-builder --dir --win",
-    "build": "npm run typecheck && electron-vite build && electron-builder --win nsis"
+    "build:dir": "npm run icon:render && npm run typecheck && electron-vite build && electron-builder --dir --win",
+    "build": "npm run icon:render && npm run typecheck && electron-vite build && electron-builder --win nsis"
   },
   "dependencies": {
     "@fontsource/inter": "^5.1.1",
@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
@@ -59,10 +60,11 @@
     },
     "files": [
       "out/**/*",
+      "build/icon.png",
       "package.json"
     ],
     "win": {
-      "signAndEditExecutable": false,
+      "icon": "build/icon.png",
       "target": [
         {
           "target": "nsis",
