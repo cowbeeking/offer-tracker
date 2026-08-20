@@ -16,6 +16,8 @@ export interface MarkdownEditorHandle {
   focus: () => void
 }
 
+export type { MarkdownChangeKind } from '@/utils/markdownHistory'
+
 function replaceRange(value: string, start: number, end: number, replacement: string, selectionStart: number, selectionEnd: number): MarkdownEditResult {
   return {
     value: `${value.slice(0, start)}${replacement}${value.slice(end)}`,

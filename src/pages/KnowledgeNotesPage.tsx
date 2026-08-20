@@ -6,6 +6,7 @@ import { MarkdownSourceEditor } from '@/components/MarkdownSourceEditor'
 import { MarkdownToolbar } from '@/components/MarkdownToolbar'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { useMarkdownDrafts } from '@/hooks/useMarkdownDrafts'
 import type { KnowledgeNote } from '@/types/application'
 import { createKnowledgeNote } from '@/utils/knowledge'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
@@ -46,6 +47,8 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
     return sortedNotes.filter((note) => `${note.title} ${note.content}`.toLocaleLowerCase().includes(needle))
   }, [query, sortedNotes])
   const selected = notes.find(({ id }) => id === selectedId)
+  const drafts = useMarkdownDrafts(notes, selectedId, (id, content) => onUpdate(id, { content }))
+  const selectedContent = selected ? drafts.contentFor(selected) : ''
 
   useEffect(() => {
     if (selectedId && notes.some(({ id }) => id === selectedId)) return
@@ -79,8 +82,8 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
     if (!selected) return
     try {
       const saved = format === 'md'
-        ? await exportMarkdown(selected.title, selected.content, '未命名知识笔记')
-        : await exportMarkdownPdf(selected.title, selected.content, '未命名知识笔记')
+        ? await exportMarkdown(selected.title, selectedContent, '未命名知识笔记')
+        : await exportMarkdownPdf(selected.title, selectedContent, '未命名知识笔记')
       if (saved) onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 知识笔记已导出`)
     } catch {
       onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 导出失败`, 'error')
@@ -150,13 +153,13 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
               <BookMarked size={14} />
               <span>知识库</span>
               <i />
-              <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
+              <small>{drafts.isPending(selected.id) ? '等待定时保存…' : `每 1 秒定时保存 · 更新于 ${formatUpdatedAt(selected.updatedAt)}`}</small>
             </div>
             <MarkdownToolbar disabled={mode === 'preview'} onAction={(action) => markdownEditorRef.current?.applyAction(action)} />
             <div className={`review-document mode-${mode}`}>
-              {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selected.content} /></article>}
-              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
-              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selected.content} onChange={(content) => onUpdate(selected.id, { content })} />}
+              {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selectedContent} /></article>}
+              {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selectedContent} onChange={(content, kind) => drafts.changeContent(selected, content, kind)} />}
+              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selectedContent} onChange={(content, kind) => drafts.changeContent(selected, content, kind)} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>建立自己的知识库</h2><p>点击右上角新建笔记，使用 Markdown 开始整理。</p></div>}
         </div>

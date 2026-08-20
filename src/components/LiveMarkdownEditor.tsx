@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
-import { applyMarkdownAction, type MarkdownAction, type MarkdownEditorHandle } from '@/utils/markdownEditing'
+import { applyMarkdownAction, type MarkdownAction, type MarkdownChangeKind, type MarkdownEditorHandle } from '@/utils/markdownEditing'
 
 interface MarkdownBlock {
   start: number
@@ -12,7 +12,7 @@ interface MarkdownBlock {
 interface LiveMarkdownEditorProps {
   documentId: string
   value: string
-  onChange: (value: string) => void
+  onChange: (value: string, kind?: MarkdownChangeKind) => void
 }
 
 interface SourceLine {
@@ -177,7 +177,11 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
       pendingSelectionRef.current = undefined
       return
     }
-    if (value !== source) setSource(value)
+    if (value !== source) {
+      setSource(value)
+      setActiveRange(undefined)
+      pendingSelectionRef.current = undefined
+    }
   }, [documentId, source, value])
 
   useLayoutEffect(() => {
@@ -204,15 +208,13 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
     const nextSource = `${source.slice(0, block.start)}${replacement}${source.slice(block.end)}`
     const absoluteStart = block.start + event.target.selectionStart
     const absoluteEnd = block.start + event.target.selectionEnd
-    const nextBlocks = parseMarkdownBlocks(nextSource)
-    const nextActive = nextBlocks.find((item) => absoluteStart >= item.start && absoluteStart <= item.end) ?? nextBlocks[nextBlocks.length - 1]
     pendingSelectionRef.current = {
-      start: Math.max(0, absoluteStart - nextActive.start),
-      end: Math.max(0, absoluteEnd - nextActive.start),
+      start: Math.max(0, absoluteStart - block.start),
+      end: Math.max(0, absoluteEnd - block.start),
     }
     setSource(nextSource)
-    setActiveRange({ start: nextActive.start, end: nextActive.end })
-    onChange(nextSource)
+    setActiveRange({ start: block.start, end: block.start + replacement.length })
+    onChange(nextSource, 'typing')
   }
 
   const applyAction = (action: MarkdownAction): void => {
@@ -228,7 +230,7 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
       start: Math.max(0, result.selectionStart - activeBlock.start),
       end: Math.max(0, result.selectionEnd - activeBlock.start),
     }
-    onChange(result.value)
+    onChange(result.value, 'action')
   }
 
   useImperativeHandle(ref, () => ({
@@ -263,7 +265,7 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
       {blocks.map((block, index) => {
         const active = Boolean(block.active)
         return (
-          <div className={`markdown-live-block ${active ? 'active' : ''}`} key={active ? `active-${block.start}` : `${block.start}-${block.end}-${index}`}>
+          <div className={`markdown-live-block ${active ? 'active' : ''}`} key={`block-${index}`}>
             {active
               ? <textarea
                   ref={editorRef}
