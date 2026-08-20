@@ -5,13 +5,14 @@ import type { Application, ApplicationDraft } from '@/types/application'
 interface ApplicationModalProps {
   open: boolean
   application?: Application
+  applications: Application[]
   statuses: string[]
   companies: string[]
   onSave: (draft: ApplicationDraft, additionalDrafts?: ApplicationDraft[]) => void
   onClose: () => void
 }
 
-export function ApplicationModal({ open, application, statuses, companies, onSave, onClose }: ApplicationModalProps): JSX.Element {
+export function ApplicationModal({ open, application, applications, statuses, companies, onSave, onClose }: ApplicationModalProps): JSX.Element {
   return (
     <Modal
       open={open}
@@ -23,6 +24,7 @@ export function ApplicationModal({ open, application, statuses, companies, onSav
       <ApplicationForm
         key={application?.id ?? 'new'}
         application={application}
+        applications={applications}
         statuses={statuses}
         companies={companies}
         onSubmit={onSave}

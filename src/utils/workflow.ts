@@ -24,3 +24,12 @@ export function getCurrentNodeDateTime(application: Application, workflowNodes: 
   if (currentHistory) return `${currentHistory.date}${currentHistory.time ? `T${currentHistory.time}` : ''}`
   return application.applicationDate
 }
+
+export function getReachedReviewNodes(application: Application, workflowNodes: WorkflowNode[]): WorkflowNode[] {
+  const reachedNodeIds = new Set(application.nodeProgress.map((progress) => progress.workflowNodeId))
+  const reachedNodeNames = new Set(application.histories.map((history) => history.status))
+  reachedNodeNames.add(application.status)
+  return workflowNodes.filter((node) => node.hasReview && (
+    reachedNodeIds.has(node.id) || reachedNodeNames.has(node.name)
+  ))
+}

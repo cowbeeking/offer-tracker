@@ -5,12 +5,13 @@ import { openExternalUrl } from '@/utils/external'
 import { createKnowledgeNote, createKnowledgeTemplate } from '@/utils/knowledge'
 import { readMarkdownFile } from '@/utils/markdownImport'
 import { createInterviewReview, createReviewTemplate, createReviewTitle } from '@/utils/review'
-import { findPreviousWorkflowNode, getCurrentNodeDateTime } from '@/utils/workflow'
+import { findPreviousWorkflowNode, getCurrentNodeDateTime, getReachedReviewNodes } from '@/utils/workflow'
 import type { Application, WorkflowNode } from '@/types/application'
 
 const nodes: WorkflowNode[] = [
   { id: 'a', name: '已投递', hasReview: false },
   { id: 'b', name: '一面', hasReview: true },
+  { id: 'c', name: '二面', hasReview: true },
 ]
 const application: Application = {
   id: 'app', companyName: '公司', positionName: '岗位', applicationDate: '2026-08-01', status: '一面',
@@ -45,6 +46,8 @@ describe('workflow utilities', () => {
   it('finds the previous experienced node and current scheduled time', () => {
     expect(findPreviousWorkflowNode(application, nodes)?.id).toBe('a')
     expect(getCurrentNodeDateTime(application, nodes)).toBe('2026-08-11T10:00')
+    expect(getReachedReviewNodes(application, nodes).map((node) => node.id)).toEqual(['b'])
+    expect(getReachedReviewNodes({ ...application, status: '已投递', histories: application.histories.slice(0, 1), nodeProgress: application.nodeProgress.slice(0, 1) }, nodes)).toEqual([])
   })
 
   it('falls back to history and application date', () => {

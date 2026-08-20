@@ -12,6 +12,7 @@ import { createInterviewReview, createReviewTitle } from '@/utils/review'
 import { exportMarkdown, exportMarkdownPdf } from '@/utils/markdownExport'
 import type { MarkdownEditorHandle } from '@/utils/markdownEditing'
 import { readMarkdownFile } from '@/utils/markdownImport'
+import { getReachedReviewNodes } from '@/utils/workflow'
 
 interface ReviewsPageProps {
   applications: Application[]
@@ -41,6 +42,9 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const [mode, setMode] = useState<ReviewMode>('live')
   const [deleting, setDeleting] = useState<InterviewReview>()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [createApplicationId, setCreateApplicationId] = useState('')
+  const [createWorkflowNodeId, setCreateWorkflowNodeId] = useState('')
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importApplicationId, setImportApplicationId] = useState('')
   const [importWorkflowNodeId, setImportWorkflowNodeId] = useState('')
@@ -53,7 +57,6 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   const sortedReviews = useMemo(() => [...reviews].sort((a, b) => b.updatedAt - a.updatedAt), [reviews])
   const reviewByApplicationNode = useMemo(() => new Map<string, string>(reviews.flatMap((review) =>
     review.applicationId && review.workflowNodeId ? [[`${review.applicationId}:${review.workflowNodeId}`, review.id] as const] : [])), [reviews])
-  const reviewNodes = useMemo(() => workflowNodes.filter((node) => node.hasReview), [workflowNodes])
   const filteredReviews = useMemo(() => {
     const needle = query.trim().toLocaleLowerCase()
     if (!needle) return sortedReviews
@@ -65,8 +68,21 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
     })
   }, [applicationById, query, sortedReviews])
   const selected = reviews.find(({ id }) => id === selectedId)
+  const selectedApplication = selected?.applicationId ? applicationById.get(selected.applicationId) : undefined
+  const selectedReviewNodes = useMemo(() => selectedApplication
+    ? getReachedReviewNodes(selectedApplication, workflowNodes)
+    : [], [selectedApplication, workflowNodes])
+  const createApplication = applications.find((application) => application.id === createApplicationId)
+  const createReviewNodes = useMemo(() => createApplication
+    ? getReachedReviewNodes(createApplication, workflowNodes)
+    : [], [createApplication, workflowNodes])
+  const createNode = createReviewNodes.find((node) => node.id === createWorkflowNodeId)
+  const createLinkExists = Boolean(createApplicationId && createWorkflowNodeId && reviewByApplicationNode.get(`${createApplicationId}:${createWorkflowNodeId}`))
   const importApplication = applications.find((application) => application.id === importApplicationId)
-  const importNode = workflowNodes.find((node) => node.id === importWorkflowNodeId)
+  const importReviewNodes = useMemo(() => importApplication
+    ? getReachedReviewNodes(importApplication, workflowNodes)
+    : [], [importApplication, workflowNodes])
+  const importNode = importReviewNodes.find((node) => node.id === importWorkflowNodeId)
   const importLinkExists = Boolean(importApplicationId && importWorkflowNodeId && reviewByApplicationNode.get(`${importApplicationId}:${importWorkflowNodeId}`))
 
   useEffect(() => {
@@ -81,10 +97,22 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
   }, [openRequest])
 
   const addReview = (): void => {
-    const review = createInterviewReview()
+    if (!createApplication || !createNode) {
+      onNotify('请先选择公司、职位和流程节点', 'error')
+      return
+    }
+    if (createLinkExists) {
+      onNotify('这条投递的该流程节点已经有复盘', 'error')
+      return
+    }
+    const review = createInterviewReview(createApplication, createNode)
     onAdd(review)
     setSelectedId(review.id)
     setMode('live')
+    setCreateDialogOpen(false)
+    setCreateApplicationId('')
+    setCreateWorkflowNodeId('')
+    onNotify(`已创建复盘「${review.title}」`)
   }
 
   const importReview = async (event: ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -151,7 +179,7 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
         <div><span className="eyebrow">Interview Notes</span><h1>面试复盘</h1><p>用 Markdown 沉淀问题、回答和下一步行动。</p></div>
         <div className="review-heading-actions">
           <Button size="sm" icon={<Upload size={14} />} onClick={() => setImportDialogOpen(true)}>导入 .md</Button>
-          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addReview}>新建复盘</Button>
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={() => { setCreateApplicationId(''); setCreateWorkflowNodeId(''); setCreateDialogOpen(true) }}>新建复盘</Button>
           <input ref={markdownFileInputRef} type="file" hidden accept=".md,.markdown,text/markdown" onChange={(event) => void importReview(event)} />
         </div>
       </header>
@@ -206,22 +234,29 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
               <select value={selected.applicationId ?? ''} onChange={(event) => {
                 const applicationId = event.target.value || undefined
                 const application = applications.find((item) => item.id === applicationId)
-                const node = workflowNodes.find((item) => item.id === selected.workflowNodeId)
-                const key = applicationId && selected.workflowNodeId ? `${applicationId}:${selected.workflowNodeId}` : undefined
+                const node = application
+                  ? getReachedReviewNodes(application, workflowNodes).find((item) => item.id === selected.workflowNodeId)
+                  : undefined
+                const key = applicationId && node ? `${applicationId}:${node.id}` : undefined
                 if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
                   onNotify('这条投递的该流程节点已经有复盘', 'error')
                   return
                 }
-                onUpdate(selected.id, { applicationId, ...(application ? { title: createReviewTitle(application, node) } : {}) })
+                onUpdate(selected.id, {
+                  applicationId,
+                  workflowNodeId: node?.id,
+                  stageName: node?.name,
+                  ...(application ? { title: createReviewTitle(application, node) } : {}),
+                })
               }}>
                 <option value="">不关联投递</option>
                 {sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}
               </select>
               <span>流程节点</span>
-              <select value={selected.workflowNodeId ?? ''} onChange={(event) => {
+              <select disabled={!selectedApplication} value={selected.workflowNodeId ?? ''} onChange={(event) => {
                 const workflowNodeId = event.target.value || undefined
-                const node = workflowNodes.find((item) => item.id === workflowNodeId)
-                const application = applications.find((item) => item.id === selected.applicationId)
+                const node = selectedReviewNodes.find((item) => item.id === workflowNodeId)
+                const application = selectedApplication
                 const key = selected.applicationId && workflowNodeId ? `${selected.applicationId}:${workflowNodeId}` : undefined
                 if (key && reviewByApplicationNode.get(key) && reviewByApplicationNode.get(key) !== selected.id) {
                   onNotify('这条投递的该流程节点已经有复盘', 'error')
@@ -229,8 +264,8 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
                 }
                 onUpdate(selected.id, { workflowNodeId, stageName: node?.name, ...(application ? { title: createReviewTitle(application, node) } : {}) })
               }}>
-                <option value="">未指定节点</option>
-                {reviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}
+                <option value="">{selectedApplication && !selectedReviewNodes.length ? '暂无已到达的复盘节点' : '未指定节点'}</option>
+                {selectedReviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}
               </select>
               <i />
               <small>已自动保存 · 更新于 {formatUpdatedAt(selected.updatedAt)}</small>
@@ -246,11 +281,21 @@ export function ReviewsPage({ applications, reviews, workflowNodes, openRequest,
       </section>
 
       <ConfirmDialog open={Boolean(deleting)} title="删除这篇面试复盘？" description={deleting ? `「${deleting.title.trim() || '未命名面试复盘'}」将被永久删除，此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
+      <Modal open={createDialogOpen} width="sm" title="新建面试复盘" description="选择已经到达的笔试或面试节点，创建与该投递关联的复盘。" onClose={() => setCreateDialogOpen(false)}>
+        <form className="review-import-form" onSubmit={(event) => { event.preventDefault(); addReview() }}>
+          <div className="review-import-grid">
+            <label className="field"><span>公司与职位 <em>*</em></span><select autoFocus required value={createApplicationId} onChange={(event) => { setCreateApplicationId(event.target.value); setCreateWorkflowNodeId('') }}><option value="">请选择投递</option>{sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}</select></label>
+            <label className="field"><span>流程节点 <em>*</em></span><select required disabled={!createApplication} value={createWorkflowNodeId} onChange={(event) => setCreateWorkflowNodeId(event.target.value)}><option value="">{createApplication && !createReviewNodes.length ? '暂无已到达的复盘节点' : '请选择节点'}</option>{createReviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+          </div>
+          <div className={`review-import-name ${createLinkExists ? 'duplicate' : ''}`}><span>创建后名称</span><strong>{createApplication && createNode ? createReviewTitle(createApplication, createNode) : '选择完整后自动生成'}</strong>{createLinkExists && <small>该投递的这个节点已经有复盘</small>}</div>
+          <footer className="modal-footer"><Button type="button" onClick={() => setCreateDialogOpen(false)}>取消</Button><Button type="submit" variant="primary" icon={<Plus size={14} />} disabled={!createApplication || !createNode || createLinkExists}>创建复盘</Button></footer>
+        </form>
+      </Modal>
       <Modal open={importDialogOpen} width="sm" title="导入面试复盘" description="先确定公司、职位和节点，再选择 Markdown 文件。原文件名不会被使用。" onClose={() => setImportDialogOpen(false)}>
         <form className="review-import-form" onSubmit={(event) => { event.preventDefault(); chooseReviewFile() }}>
           <div className="review-import-grid">
-            <label className="field"><span>公司与职位 <em>*</em></span><select autoFocus required value={importApplicationId} onChange={(event) => setImportApplicationId(event.target.value)}><option value="">请选择投递</option>{sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}</select></label>
-            <label className="field"><span>流程节点 <em>*</em></span><select required value={importWorkflowNodeId} onChange={(event) => setImportWorkflowNodeId(event.target.value)}><option value="">请选择节点</option>{reviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
+            <label className="field"><span>公司与职位 <em>*</em></span><select autoFocus required value={importApplicationId} onChange={(event) => { setImportApplicationId(event.target.value); setImportWorkflowNodeId('') }}><option value="">请选择投递</option>{sortedApplications.map((application) => <option value={application.id} key={application.id}>{application.companyName} · {application.positionName}</option>)}</select></label>
+            <label className="field"><span>流程节点 <em>*</em></span><select required disabled={!importApplication} value={importWorkflowNodeId} onChange={(event) => setImportWorkflowNodeId(event.target.value)}><option value="">{importApplication && !importReviewNodes.length ? '暂无已到达的复盘节点' : '请选择节点'}</option>{importReviewNodes.map((node) => <option value={node.id} key={node.id}>{node.name}</option>)}</select></label>
           </div>
           <div className={`review-import-name ${importLinkExists ? 'duplicate' : ''}`}><span>导入后名称</span><strong>{importApplication && importNode ? createReviewTitle(importApplication, importNode) : '选择完整后自动生成'}</strong>{importLinkExists && <small>该投递的这个节点已经有复盘</small>}</div>
           <footer className="modal-footer"><Button type="button" onClick={() => setImportDialogOpen(false)}>取消</Button><Button type="submit" variant="primary" icon={<Upload size={14} />} disabled={!importApplication || !importNode || importLinkExists}>选择 MD 文件</Button></footer>

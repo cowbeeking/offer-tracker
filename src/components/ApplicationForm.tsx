@@ -28,18 +28,32 @@ function draftFromApplication(application?: Application): ApplicationDraft {
 
 interface ApplicationFormProps {
   application?: Application
+  applications: Application[]
   statuses: string[]
   companies: string[]
   onSubmit: (draft: ApplicationDraft, additionalDrafts?: ApplicationDraft[]) => void
   onCancel: () => void
 }
 
-export function ApplicationForm({ application, statuses, companies, onSubmit, onCancel }: ApplicationFormProps): JSX.Element {
+export function ApplicationForm({ application, applications, statuses, companies, onSubmit, onCancel }: ApplicationFormProps): JSX.Element {
   const [draft, setDraft] = useState<ApplicationDraft>(() => draftFromApplication(application))
   const [error, setError] = useState('')
   const [eventDateTouched, setEventDateTouched] = useState(false)
   const [additionalPositions, setAdditionalPositions] = useState<string[]>([])
   const companyOptions = useMemo(() => [...new Set(companies)].sort((a, b) => a.localeCompare(b, 'zh-CN')), [companies])
+  const companyKey = draft.companyName.trim().toLocaleLowerCase()
+  const existingMaxPreference = applications.reduce((maximum, item) => {
+    if (!companyKey || item.companyName.trim().toLocaleLowerCase() !== companyKey) return maximum
+    return Math.max(maximum, item.preferenceOrder ?? 0)
+  }, 0)
+  const requestedPrimaryOrder = /^\d+$/.test(draft.preferenceOrder) && Number(draft.preferenceOrder) > 0
+    ? Number(draft.preferenceOrder)
+    : undefined
+  const inferredPrimaryOrder = requestedPrimaryOrder ?? existingMaxPreference + 1
+  const primaryAlreadyNumberedInCompany = Boolean(
+    application?.preferenceOrder && application.companyName.trim().toLocaleLowerCase() === companyKey,
+  )
+  const firstAdditionalOrder = existingMaxPreference + (primaryAlreadyNumberedInCompany ? 1 : 2)
 
   const setField = <K extends keyof ApplicationDraft>(field: K, value: ApplicationDraft[K]): void => {
     if (error) setError('')
@@ -78,12 +92,13 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
       setError('流程事件日期不能早于投递日期。')
       return
     }
-    const primaryDraft = additionalPositions.length && !draft.preferenceOrder ? { ...draft, preferenceOrder: '1' } : draft
-    const primaryOrder = Number(primaryDraft.preferenceOrder || '1')
+    const primaryDraft = additionalPositions.length && !draft.preferenceOrder
+      ? { ...draft, preferenceOrder: String(inferredPrimaryOrder) }
+      : draft
     const additionalDrafts = additionalPositions.map((positionName, index) => ({
       ...draft,
       positionName: positionName.trim(),
-      preferenceOrder: String(primaryOrder + index + 1),
+      preferenceOrder: String(firstAdditionalOrder + index),
     }))
     onSubmit(primaryDraft, additionalDrafts)
   }
@@ -122,7 +137,7 @@ export function ApplicationForm({ application, statuses, companies, onSubmit, on
           </div>
           {additionalPositions.length > 0 && <div className="additional-preference-list">
             {additionalPositions.map((position, index) => {
-              const order = Number(draft.preferenceOrder || '1') + index + 1
+              const order = firstAdditionalOrder + index
               const isLast = index === additionalPositions.length - 1
               return <label className="field additional-preference-field" key={index}>
                 <span>第 {order} 志愿岗位名称 <em>*</em></span>

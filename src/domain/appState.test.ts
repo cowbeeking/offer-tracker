@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { appReducer, createEmptyState, normalizeApplications } from '@/domain/appState'
+import { appReducer, createEmptyState, normalizeApplications, normalizePreferenceOrders } from '@/domain/appState'
 import type { AppStateData, Application, ApplicationDraft, InterviewReview, WorkflowNode } from '@/types/application'
 
 const nodes: WorkflowNode[] = [
@@ -69,7 +69,7 @@ describe('appReducer workflow invariants', () => {
 
   it('does not let the edit form bypass board-only workflow changes', () => {
     const updated = appReducer(state(), { type: 'UPDATE_APPLICATION', id: 'app-1', draft: draft('一面') })
-    expect(updated.applications[0]).toMatchObject({ status: '笔试', companyName: '更新公司', positionName: '新岗位', preferenceOrder: 2 })
+    expect(updated.applications[0]).toMatchObject({ status: '笔试', companyName: '更新公司', positionName: '新岗位', preferenceOrder: 1 })
     expect(updated.applications[0].histories).toHaveLength(2)
   })
 
@@ -107,6 +107,26 @@ describe('appReducer relationship integrity', () => {
     expect(next.reviews[0]).toMatchObject({ applicationId: undefined, workflowNodeId: undefined, stageName: undefined })
   })
 
+  it('does not link a review to a workflow node the application has not reached', () => {
+    const next = appReducer(state(), {
+      type: 'UPDATE_REVIEW',
+      id: 'review-1',
+      changes: { workflowNodeId: 'c', stageName: '一面' },
+    })
+
+    expect(next.reviews[0]).toMatchObject({ applicationId: 'app-1', workflowNodeId: undefined, stageName: undefined })
+  })
+
+  it('does not create a new review without an application and reached node', () => {
+    const current = state()
+    const next = appReducer(current, {
+      type: 'ADD_REVIEW',
+      review: review({ id: 'unlinked', applicationId: undefined, workflowNodeId: undefined, stageName: undefined }),
+    })
+
+    expect(next).toBe(current)
+  })
+
   it('preserves notes but fully unlinks them when an application is deleted', () => {
     const next = appReducer(state(), { type: 'DELETE_APPLICATION', id: 'app-1' })
     expect(next.applications).toHaveLength(0)
@@ -129,5 +149,51 @@ describe('appReducer relationship integrity', () => {
     })], nodes)[0]
     expect(normalized.nodeProgress).toHaveLength(2)
     expect(normalized.nodeProgress.filter((item) => item.state === 'active')).toEqual([expect.objectContaining({ workflowNodeId: 'b' })])
+  })
+})
+
+describe('application preference invariants', () => {
+  it('assigns an appended preference after the current company maximum', () => {
+    const current = {
+      ...state(),
+      applications: [
+        application({ id: 'first', preferenceOrder: 1, createdAt: 1 }),
+        application({ id: 'second', positionName: '算法工程师', preferenceOrder: 2, createdAt: 2 }),
+      ],
+    }
+    const appendedDraft = {
+      ...draft('已投递'),
+      companyName: '示例公司',
+      positionName: '测试工程师',
+      preferenceOrder: '2',
+    }
+    const next = appReducer(current, { type: 'ADD_APPLICATION', draft: appendedDraft })
+
+    expect(next.applications.find((item) => item.positionName === '测试工程师')?.preferenceOrder).toBe(3)
+  })
+
+  it('repairs duplicate and gapped preference orders per company', () => {
+    const normalized = normalizePreferenceOrders([
+      application({ id: 'first', preferenceOrder: 1, createdAt: 1 }),
+      application({ id: 'second', positionName: '算法工程师', preferenceOrder: 2, createdAt: 2 }),
+      application({ id: 'third', positionName: '测试工程师', preferenceOrder: 2, createdAt: 3 }),
+      application({ id: 'other', companyName: '另一家公司', preferenceOrder: 4, createdAt: 4 }),
+    ])
+
+    expect(normalized.map((item) => item.preferenceOrder)).toEqual([1, 2, 3, 1])
+  })
+
+  it('closes the numbering gap after deleting a preference', () => {
+    const withPreferences = {
+      ...state(),
+      applications: [
+        application({ id: 'first', preferenceOrder: 1, createdAt: 1 }),
+        application({ id: 'second', preferenceOrder: 2, createdAt: 2 }),
+        application({ id: 'third', preferenceOrder: 3, createdAt: 3 }),
+      ],
+    }
+    const next = appReducer(withPreferences, { type: 'DELETE_APPLICATION', id: 'second' })
+
+    expect(next.applications.map((item) => item.preferenceOrder)).toEqual([1, 2])
   })
 })
