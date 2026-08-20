@@ -46,7 +46,7 @@ describe('useMarkdownDrafts', () => {
       setter?.call(textarea, 'a')
       textarea.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await act(async () => vi.advanceTimersByTime(800))
+    await act(async () => vi.advanceTimersByTime(59_800))
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
       setter?.call(textarea, 'latest')

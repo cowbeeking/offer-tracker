@@ -16,10 +16,11 @@ interface MarkdownDocument {
 interface MarkdownDrafts {
   contentFor: (document: MarkdownDocument) => string
   changeContent: (document: MarkdownDocument, value: string, kind?: MarkdownChangeKind) => void
+  flush: (id: string) => void
   isPending: (id: string) => boolean
 }
 
-const SAVE_DELAY_MS = 1000
+const SAVE_DELAY_MS = 60_000
 
 export function useMarkdownDrafts(
   documents: MarkdownDocument[],
@@ -141,6 +142,7 @@ export function useMarkdownDrafts(
   return {
     contentFor: (document) => draftsRef.current.get(document.id) ?? document.content,
     changeContent,
+    flush: (id) => flush(id, true),
     isPending: (id) => pendingRef.current.has(id),
   }
 }

@@ -50,12 +50,29 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
   const drafts = useMarkdownDrafts(notes, selectedId, (id, content) => onUpdate(id, { content }))
   const selectedContent = selected ? drafts.contentFor(selected) : ''
 
+  const flushCurrent = (): void => {
+    markdownEditorRef.current?.flush?.()
+    if (selected) drafts.flush(selected.id)
+  }
+
+  const selectNote = (id: string): void => {
+    flushCurrent()
+    setSelectedId(id)
+    setMode('live')
+  }
+
+  const changeMode = (nextMode: EditorMode): void => {
+    flushCurrent()
+    setMode(nextMode)
+  }
+
   useEffect(() => {
     if (selectedId && notes.some(({ id }) => id === selectedId)) return
     setSelectedId(sortedNotes[0]?.id)
   }, [notes, selectedId, sortedNotes])
 
   const addNote = (): void => {
+    flushCurrent()
     const note = createKnowledgeNote()
     onAdd(note)
     setSelectedId(note.id)
@@ -69,6 +86,7 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
     try {
       const imported = await readMarkdownFile(file, '未命名知识笔记')
       const note = { ...createKnowledgeNote(), ...imported }
+      flushCurrent()
       onAdd(note)
       setSelectedId(note.id)
       setMode('live')
@@ -80,10 +98,12 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
 
   const exportNote = async (format: 'md' | 'pdf'): Promise<void> => {
     if (!selected) return
+    markdownEditorRef.current?.flush?.()
+    const content = drafts.contentFor(selected)
     try {
       const saved = format === 'md'
-        ? await exportMarkdown(selected.title, selectedContent, '未命名知识笔记')
-        : await exportMarkdownPdf(selected.title, selectedContent, '未命名知识笔记')
+        ? await exportMarkdown(selected.title, content, '未命名知识笔记')
+        : await exportMarkdownPdf(selected.title, content, '未命名知识笔记')
       if (saved) onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 知识笔记已导出`)
     } catch {
       onNotify(`${format === 'md' ? 'Markdown' : 'PDF'} 导出失败`, 'error')
@@ -120,7 +140,7 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
           <div className="review-note-list">
             {filteredNotes.map((note) => (
               <div key={note.id} className={`review-note-card ${selectedId === note.id ? 'active' : ''}`}>
-                <button className="review-note-select" onClick={() => { setSelectedId(note.id); setMode('live') }}>
+                <button className="review-note-select" onClick={() => selectNote(note.id)}>
                   <span className="review-note-icon"><BookMarked size={15} /></span>
                   <span className="review-note-copy">
                     <strong>{note.title.trim() || '未命名知识笔记'}</strong>
@@ -141,9 +161,9 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
               <input className="review-title-input" value={selected.title} maxLength={100} onChange={(event) => onUpdate(selected.id, { title: event.target.value })} placeholder="未命名知识笔记" />
               <div className="review-editor-tools">
                 <div className="review-mode-switch" role="group" aria-label="编辑模式">
-                  <button className={mode === 'source' ? 'active' : ''} onClick={() => setMode('source')}><Code2 size={13} />源码</button>
-                  <button className={mode === 'live' ? 'active' : ''} onClick={() => setMode('live')}><Sparkles size={13} />实时预览</button>
-                  <button className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')}><Eye size={13} />预览</button>
+                  <button className={mode === 'source' ? 'active' : ''} onClick={() => changeMode('source')}><Code2 size={13} />源码</button>
+                  <button className={mode === 'live' ? 'active' : ''} onClick={() => changeMode('live')}><Sparkles size={13} />实时预览</button>
+                  <button className={mode === 'preview' ? 'active' : ''} onClick={() => changeMode('preview')}><Eye size={13} />预览</button>
                 </div>
                 <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => void exportNote('md')}>导出 .md</Button>
                 <Button size="sm" variant="ghost" icon={<FileDown size={14} />} onClick={() => void exportNote('pdf')}>导出 PDF</Button>
@@ -153,13 +173,16 @@ export function KnowledgeNotesPage({ notes, onAdd, onUpdate, onDelete, onNotify 
               <BookMarked size={14} />
               <span>知识库</span>
               <i />
-              <small>{drafts.isPending(selected.id) ? '等待定时保存…' : `每 1 秒定时保存 · 更新于 ${formatUpdatedAt(selected.updatedAt)}`}</small>
+              <small>{drafts.isPending(selected.id) ? '等待每分钟自动保存…' : `每 1 分钟自动保存 · 更新于 ${formatUpdatedAt(selected.updatedAt)}`}</small>
             </div>
             <MarkdownToolbar disabled={mode === 'preview'} onAction={(action) => markdownEditorRef.current?.applyAction(action)} />
             <div className={`review-document mode-${mode}`}>
               {mode === 'preview' && <article className="markdown-preview markdown-prose"><MarkdownContent source={selectedContent} /></article>}
               {mode === 'source' && <MarkdownSourceEditor ref={markdownEditorRef} value={selectedContent} onChange={(content, kind) => drafts.changeContent(selected, content, kind)} />}
-              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selectedContent} onChange={(content, kind) => drafts.changeContent(selected, content, kind)} />}
+              {mode === 'live' && <LiveMarkdownEditor ref={markdownEditorRef} documentId={selected.id} value={selectedContent} onChange={(documentId, content, kind) => {
+                const document = notes.find((note) => note.id === documentId)
+                if (document) drafts.changeContent(document, content, kind)
+              }} />}
             </div>
           </> : <div className="review-editor-empty"><span><FileText size={25} /></span><h2>建立自己的知识库</h2><p>点击右上角新建笔记，使用 Markdown 开始整理。</p></div>}
         </div>

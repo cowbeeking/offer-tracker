@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import { MarkdownContent } from '@/components/MarkdownContent'
 import { applyMarkdownAction, type MarkdownAction, type MarkdownChangeKind, type MarkdownEditorHandle } from '@/utils/markdownEditing'
 
@@ -12,7 +12,12 @@ interface MarkdownBlock {
 interface LiveMarkdownEditorProps {
   documentId: string
   value: string
-  onChange: (value: string, kind?: MarkdownChangeKind) => void
+  onChange: (documentId: string, value: string, kind?: MarkdownChangeKind) => void
+}
+
+interface EditingContext {
+  beforeBlocks: MarkdownBlock[]
+  afterBlocks: MarkdownBlock[]
 }
 
 interface SourceLine {
@@ -23,6 +28,7 @@ interface SourceLine {
 
 const LIST_ITEM_PATTERN = /^\s*(?:[-+*]|\d+[.)])\s+/
 const TABLE_DIVIDER_PATTERN = /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/
+const CHANGE_PROPAGATION_DELAY_MS = 180
 
 function sourceLines(source: string): SourceLine[] {
   const lines: SourceLine[] = []
@@ -145,13 +151,53 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const pendingSelectionRef = useRef<{ start: number; end: number }>()
   const previousDocumentRef = useRef(documentId)
+  const sourceRef = useRef(source)
+  const onChangeRef = useRef(onChange)
+  const editingContextRef = useRef<EditingContext>()
+  const pendingPropagationRef = useRef<{ documentId: string; value: string }>()
+  const propagationTimerRef = useRef<number>()
+  const lastEmittedRef = useRef({ documentId, value })
+
+  sourceRef.current = source
+  onChangeRef.current = onChange
+
+  const flushPropagation = useCallback((): void => {
+    if (propagationTimerRef.current !== undefined) window.clearTimeout(propagationTimerRef.current)
+    propagationTimerRef.current = undefined
+    const pending = pendingPropagationRef.current
+    if (!pending) return
+    pendingPropagationRef.current = undefined
+    lastEmittedRef.current = pending
+    onChangeRef.current(pending.documentId, pending.value, 'typing')
+  }, [])
+
+  const queuePropagation = useCallback((nextDocumentId: string, nextValue: string): void => {
+    pendingPropagationRef.current = { documentId: nextDocumentId, value: nextValue }
+    if (propagationTimerRef.current !== undefined) return
+    propagationTimerRef.current = window.setTimeout(flushPropagation, CHANGE_PROPAGATION_DELAY_MS)
+  }, [flushPropagation])
+
+  const prepareEditingContext = (currentSource: string, start: number, end: number): void => {
+    const before = currentSource.slice(0, start)
+    const after = currentSource.slice(end)
+    editingContextRef.current = {
+      beforeBlocks: before ? parseMarkdownBlocks(before) : [],
+      afterBlocks: after ? parseMarkdownBlocks(after) : [],
+    }
+    setActiveRange({ start, end })
+  }
+
+  const stopEditing = (): void => {
+    editingContextRef.current = undefined
+    setActiveRange(undefined)
+  }
+
   const blocks = useMemo(() => {
     if (!activeRange) return parseMarkdownBlocks(source)
-    const before = source.slice(0, activeRange.start)
-    const after = source.slice(activeRange.end)
-    const beforeBlocks = before ? parseMarkdownBlocks(before) : []
-    const afterBlocks = after
-      ? parseMarkdownBlocks(after).map((block) => ({
+    const context = editingContextRef.current
+    const beforeBlocks = context?.beforeBlocks ?? []
+    const afterBlocks = context?.afterBlocks
+      ? context.afterBlocks.map((block) => ({
           ...block,
           start: block.start + activeRange.end,
           end: block.end + activeRange.end,
@@ -171,18 +217,29 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
 
   useEffect(() => {
     if (previousDocumentRef.current !== documentId) {
+      flushPropagation()
       previousDocumentRef.current = documentId
+      sourceRef.current = value
+      lastEmittedRef.current = { documentId, value }
       setSource(value)
-      setActiveRange(undefined)
+      stopEditing()
       pendingSelectionRef.current = undefined
       return
     }
-    if (value !== source) {
-      setSource(value)
-      setActiveRange(undefined)
-      pendingSelectionRef.current = undefined
-    }
-  }, [documentId, source, value])
+    if (value === sourceRef.current) return
+    const lastEmitted = lastEmittedRef.current
+    if (lastEmitted.documentId === documentId && lastEmitted.value === value) return
+    if (propagationTimerRef.current !== undefined) window.clearTimeout(propagationTimerRef.current)
+    propagationTimerRef.current = undefined
+    pendingPropagationRef.current = undefined
+    sourceRef.current = value
+    lastEmittedRef.current = { documentId, value }
+    setSource(value)
+    stopEditing()
+    pendingSelectionRef.current = undefined
+  }, [documentId, flushPropagation, value])
+
+  useEffect(() => () => flushPropagation(), [flushPropagation])
 
   useLayoutEffect(() => {
     const editor = editorRef.current
@@ -200,7 +257,7 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
   const activate = (block: MarkdownBlock): void => {
     const end = editableEnd(block.text)
     pendingSelectionRef.current = { start: end, end }
-    setActiveRange({ start: block.start, end: block.end })
+    prepareEditingContext(source, block.start, block.end)
   }
 
   const updateBlock = (block: MarkdownBlock, event: ChangeEvent<HTMLTextAreaElement>): void => {
@@ -219,15 +276,16 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
     }
     setSource(nextSource)
     setActiveRange({ start: editStart, end: editStart + replacement.length })
-    onChange(nextSource, 'typing')
+    queuePropagation(documentId, nextSource)
   }
 
   const appendBlock = (): void => {
     pendingSelectionRef.current = { start: 0, end: 0 }
-    setActiveRange({ start: source.length, end: source.length })
+    prepareEditingContext(source, source.length, source.length)
   }
 
   const applyAction = (action: MarkdownAction): void => {
+    flushPropagation()
     const editor = editorRef.current
     const selectionStart = activeRange && editor ? activeRange.start + editor.selectionStart : source.length
     const selectionEnd = activeRange && editor ? activeRange.start + editor.selectionEnd : selectionStart
@@ -235,20 +293,23 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
     const nextBlocks = parseMarkdownBlocks(result.value)
     const activeBlock = nextBlocks.find((block) => result.selectionStart >= block.start && result.selectionStart <= block.end) ?? nextBlocks[nextBlocks.length - 1]
     setSource(result.value)
-    setActiveRange({ start: activeBlock.start, end: activeBlock.end })
+    prepareEditingContext(result.value, activeBlock.start, activeBlock.end)
     pendingSelectionRef.current = {
       start: Math.max(0, result.selectionStart - activeBlock.start),
       end: Math.max(0, result.selectionEnd - activeBlock.start),
     }
-    onChange(result.value, 'action')
+    lastEmittedRef.current = { documentId, value: result.value }
+    onChangeRef.current(documentId, result.value, 'action')
   }
 
   useImperativeHandle(ref, () => ({
     applyAction,
     focus: () => editorRef.current?.focus(),
+    flush: flushPropagation,
   }))
 
   const handleEditorKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if ((event.ctrlKey || event.metaKey) && ['y', 'z'].includes(event.key.toLocaleLowerCase())) flushPropagation()
     if ((event.ctrlKey || event.metaKey) && event.key.toLocaleLowerCase() === 'b') {
       event.preventDefault()
       applyAction({ type: 'bold' })
@@ -261,13 +322,14 @@ export const LiveMarkdownEditor = forwardRef<MarkdownEditorHandle, LiveMarkdownE
     }
     if (event.key === 'Escape') {
       event.currentTarget.blur()
-      setActiveRange(undefined)
+      stopEditing()
     }
   }
 
   const handleBlur = (event: FocusEvent<HTMLTextAreaElement>): void => {
     if (event.relatedTarget instanceof Element && event.relatedTarget.closest('.markdown-toolbar')) return
-    setActiveRange(undefined)
+    flushPropagation()
+    stopEditing()
   }
 
   return (
