@@ -324,7 +324,7 @@ export function App(): JSX.Element {
         </div>
       </main>
 
-      <ApplicationModal open={formOpen} application={editing} statuses={statuses} companies={companies} onSave={saveApplication} onClose={() => { setFormOpen(false); setEditing(undefined) }} />
+      <ApplicationModal open={formOpen} application={editing} applications={state.applications} statuses={statuses} companies={companies} onSave={saveApplication} onClose={() => { setFormOpen(false); setEditing(undefined) }} />
       <ApplicationDetail application={detailApplication} workflowNodes={state.workflowNodes} reviews={state.reviews} onClose={() => setDetailId(undefined)} onEdit={openEdit} onDelete={setDeleting} onUndo={undoApplicationStatus} onReview={openApplicationReview} onNodeProgress={handleNodeProgress} />
       <ConfirmDialog open={Boolean(deleting)} title="删除这条投递记录？" description={deleting ? `将永久删除「${deleting.companyName} · ${deleting.positionName}」及全部流程历史；关联复盘会保留为未关联笔记。此操作无法撤销。` : ''} confirmText="确认删除" onClose={() => setDeleting(undefined)} onConfirm={confirmDelete} />
       {reminderAlert && <div className="node-reminder" role="alertdialog" aria-label="招聘节点提醒">

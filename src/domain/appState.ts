@@ -13,7 +13,7 @@ import type {
 } from '@/types/application'
 import { isValidLocalDateTime, toDateInput } from '@/utils/date'
 import { createId } from '@/utils/id'
-import { findPreviousWorkflowNode } from '@/utils/workflow'
+import { findPreviousWorkflowNode, getReachedReviewNodes } from '@/utils/workflow'
 
 export type AppAction =
   | { type: 'LOAD'; state: AppStateData }
@@ -107,11 +107,40 @@ export function normalizeWorkflowNodes(state: Partial<AppStateData>): WorkflowNo
   return nodes.length ? nodes : DEFAULT_WORKFLOW_NODES.map((node) => ({ ...node }))
 }
 
+export function normalizePreferenceOrders(applications: Application[]): Application[] {
+  const groups = new Map<string, Application[]>()
+  applications.forEach((application) => {
+    if (application.preferenceOrder === undefined) return
+    const key = application.companyName.trim().toLocaleLowerCase()
+    const group = groups.get(key) ?? []
+    group.push(application)
+    groups.set(key, group)
+  })
+
+  const orderById = new Map<string, number>()
+  groups.forEach((group) => {
+    group
+      .sort((a, b) => {
+        const aOrder = Number.isInteger(a.preferenceOrder) && a.preferenceOrder! > 0 ? a.preferenceOrder! : Number.MAX_SAFE_INTEGER
+        const bOrder = Number.isInteger(b.preferenceOrder) && b.preferenceOrder! > 0 ? b.preferenceOrder! : Number.MAX_SAFE_INTEGER
+        return aOrder - bOrder || a.createdAt - b.createdAt || a.id.localeCompare(b.id)
+      })
+      .forEach((application, index) => orderById.set(application.id, index + 1))
+  })
+
+  return applications.map((application) => {
+    const preferenceOrder = orderById.get(application.id)
+    return preferenceOrder === undefined || preferenceOrder === application.preferenceOrder
+      ? application
+      : { ...application, preferenceOrder }
+  })
+}
+
 export function normalizeApplications(applications: Application[], nodes: WorkflowNode[]): Application[] {
   const nodeById = new Map(nodes.map((node) => [node.id, node]))
   const nodeByName = new Map(nodes.map((node) => [node.name, node]))
   const nodeOrder = new Map(nodes.map((node, index) => [node.id, index]))
-  return applications.map((application) => {
+  return normalizePreferenceOrders(applications.map((application) => {
     const currentNode = nodeByName.get(application.status) ?? nodes[0]
     const status = currentNode?.name ?? application.status
     const byNode = new Map<string, ApplicationNodeProgress>()
@@ -142,7 +171,7 @@ export function normalizeApplications(applications: Application[], nodes: Workfl
         : { ...progress, state: 'completed' as const, reminderMinutesBefore: undefined, reminderSentAt: undefined })
       .sort((a, b) => (nodeOrder.get(a.workflowNodeId) ?? Number.MAX_SAFE_INTEGER) - (nodeOrder.get(b.workflowNodeId) ?? Number.MAX_SAFE_INTEGER))
     return { ...application, status, nodeProgress }
-  })
+  }))
 }
 
 export function uniqueReviewLinks(reviews: InterviewReview[], applications: Application[], nodes: WorkflowNode[]): InterviewReview[] {
@@ -154,15 +183,16 @@ export function uniqueReviewLinks(reviews: InterviewReview[], applications: Appl
     if (review.applicationId && !application) {
       return { ...review, applicationId: undefined, workflowNodeId: undefined, stageName: undefined }
     }
-    const validSavedNode = review.workflowNodeId && nodeById.get(review.workflowNodeId)?.hasReview ? nodeById.get(review.workflowNodeId) : undefined
+    const reachedReviewNodes = application ? getReachedReviewNodes(application, nodes) : []
+    const validSavedNode = review.workflowNodeId ? reachedReviewNodes.find((node) => node.id === review.workflowNodeId) : undefined
     const inferredNode = !validSavedNode && application
-      ? nodes.find((node) => node.hasReview && (
+      ? reachedReviewNodes.find((node) => (
           node.name === review.stageName ||
           node.name === application.status ||
           review.title.includes(node.name) ||
           review.content.includes(`**当前阶段：** ${node.name}`) ||
           review.content.includes(`**复盘节点：** ${node.name}`)
-        )) ?? [...application.histories].reverse().flatMap((history) => nodes.filter((node) => node.hasReview && node.name === history.status))[0]
+        ))
       : undefined
     const workflowNodeId = validSavedNode?.id ?? inferredNode?.id
     const stageName = workflowNodeId ? (nodeById.get(workflowNodeId)?.name ?? review.stageName) : undefined
@@ -223,21 +253,22 @@ export function appReducer(state: AppStateData, action: AppAction): AppStateData
     case 'REPLACE_DATA':
       return normalizeState(action.type === 'LOAD' ? action.state : action.data)
     case 'ADD_APPLICATION':
-      return { ...state, applications: [applicationFromDraft(action.draft, state.workflowNodes), ...state.applications] }
+      return { ...state, applications: normalizePreferenceOrders([applicationFromDraft(action.draft, state.workflowNodes), ...state.applications]) }
     case 'UPDATE_APPLICATION':
-      return { ...state, applications: state.applications.map((application) => application.id === action.id ? updateApplicationFields(application, action.draft) : application) }
+      return { ...state, applications: normalizePreferenceOrders(state.applications.map((application) => application.id === action.id ? updateApplicationFields(application, action.draft) : application)) }
     case 'DELETE_APPLICATION':
       return {
         ...state,
-        applications: state.applications.filter(({ id }) => id !== action.id),
+        applications: normalizePreferenceOrders(state.applications.filter(({ id }) => id !== action.id)),
         reviews: state.reviews.map((review) => review.applicationId === action.id
           ? { ...review, applicationId: undefined, workflowNodeId: undefined, stageName: undefined, updatedAt: Date.now() }
           : review),
       }
     case 'ADD_REVIEW': {
-      const linked = action.review.applicationId && action.review.workflowNodeId
-      if (linked && state.reviews.some((review) => review.applicationId === action.review.applicationId && review.workflowNodeId === action.review.workflowNodeId)) return state
-      return { ...state, reviews: [action.review, ...state.reviews] }
+      const normalizedReview = uniqueReviewLinks([action.review], state.applications, state.workflowNodes)[0]
+      const linked = normalizedReview.applicationId && normalizedReview.workflowNodeId
+      if (linked && state.reviews.some((review) => review.applicationId === normalizedReview.applicationId && review.workflowNodeId === normalizedReview.workflowNodeId)) return state
+      return { ...state, reviews: [normalizedReview, ...state.reviews] }
     }
     case 'UPDATE_REVIEW': {
       const current = state.reviews.find((review) => review.id === action.id)
@@ -247,7 +278,10 @@ export function appReducer(state: AppStateData, action: AppAction): AppStateData
       const applicationId = hasApplication ? action.changes.applicationId : current.applicationId
       const requestedNodeId = hasNode ? action.changes.workflowNodeId : current.workflowNodeId
       const workflowNodeId = applicationId ? requestedNodeId : undefined
-      const node = workflowNodeId ? state.workflowNodes.find((item) => item.id === workflowNodeId && item.hasReview) : undefined
+      const application = applicationId ? state.applications.find((item) => item.id === applicationId) : undefined
+      const node = workflowNodeId && application
+        ? getReachedReviewNodes(application, state.workflowNodes).find((item) => item.id === workflowNodeId)
+        : undefined
       const normalizedNodeId = node?.id
       if (applicationId && normalizedNodeId && state.reviews.some((review) => review.id !== action.id && review.applicationId === applicationId && review.workflowNodeId === normalizedNodeId)) return state
       const changes = {
@@ -328,7 +362,7 @@ export function appReducer(state: AppStateData, action: AppAction): AppStateData
       const demoIds = new Set(state.applications.filter(({ isDemo }) => isDemo).map(({ id }) => id))
       return {
         ...state,
-        applications: state.applications.filter(({ isDemo }) => !isDemo),
+        applications: normalizePreferenceOrders(state.applications.filter(({ isDemo }) => !isDemo)),
         reviews: state.reviews.map((review) => review.applicationId && demoIds.has(review.applicationId)
           ? { ...review, applicationId: undefined, workflowNodeId: undefined, stageName: undefined, updatedAt: Date.now() }
           : review),
