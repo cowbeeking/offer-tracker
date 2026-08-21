@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ExternalLink, Pencil, Search, Trash2, X } from 'lucide-react'
+import { ExternalLink, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { DeadlineBadge } from '@/components/DeadlineBadge'
 import { EmptyState } from '@/components/EmptyState'
@@ -55,8 +55,11 @@ export function ApplicationsPage({ applications, statuses, searchRequest, onAdd,
 
   return (
     <div className="page applications-page">
-      <header className="page-heading">
+      <header className="page-heading page-heading-row review-page-heading">
         <div><span className="eyebrow">Applications</span><h1>投递记录</h1><p>共 {applications.length} 条记录，持续推进每一个机会。</p></div>
+        <div className="page-heading-actions">
+          <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={onAdd}>新增投递</Button>
+        </div>
       </header>
       <section className="panel table-panel">
         <div className="filter-bar">

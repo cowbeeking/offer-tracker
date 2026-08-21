@@ -108,10 +108,6 @@
     @apply flex items-center gap-2;
   }
 
-  .topbar-create {
-    @apply text-[11px] font-medium;
-  }
-
   .topbar-search {
     @apply flex h-7 items-center gap-1.5 rounded-md border border-line bg-canvas/70 px-2 text-[10px] text-muted transition hover:border-ink/20 hover:text-ink;
   }
@@ -1696,6 +1692,7 @@
     @apply flex-none items-center;
   }
 
+  .page-heading-actions,
   .review-heading-actions {
     @apply flex flex-wrap items-center justify-end gap-2;
   }
@@ -1938,6 +1935,23 @@
   .format-heading select,
   .markdown-code-select select {
     @apply h-7 appearance-none border-0 bg-transparent text-[9px] font-medium text-ink outline-none;
+    color-scheme: light;
+  }
+
+  .format-heading select option,
+  .markdown-code-select select option {
+    background-color: rgb(var(--panel));
+    color: rgb(var(--ink));
+  }
+
+  .format-heading select option:disabled,
+  .markdown-code-select select option:disabled {
+    color: rgb(var(--muted));
+  }
+
+  .dark .format-heading select,
+  .dark .markdown-code-select select {
+    color-scheme: dark;
   }
 
   .format-heading select {

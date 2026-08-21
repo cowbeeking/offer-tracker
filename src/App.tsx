@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, BellRing, Check, Clock3, Plus, RefreshCw, Search, X } from 'lucide-react'
+import { AlertTriangle, BellRing, Check, Clock3, RefreshCw, Search, X } from 'lucide-react'
 import { ApplicationDetail } from '@/components/ApplicationDetail'
 import { ApplicationModal } from '@/components/ApplicationModal'
 import { Sidebar } from '@/components/Sidebar'
@@ -310,7 +310,6 @@ export function App(): JSX.Element {
           <div className="breadcrumb"><span>Autumn Tracker</span><i>/</i><strong>{PAGE_LABELS[page]}</strong></div>
           <div className="topbar-actions">
             <button className="topbar-search" onClick={() => { navigateTo('applications'); setSearchRequest((value) => value + 1) }}><Search size={15} /><span>快速搜索</span><kbd>Ctrl K</kbd></button>
-            {page === 'applications' && <Button className="topbar-create" variant="primary" size="sm" icon={<Plus size={14} />} onClick={openCreate}>新增投递</Button>}
           </div>
         </div>}
         <div className={`page-container ${page === 'settings' ? 'settings-container' : ''}`}>
